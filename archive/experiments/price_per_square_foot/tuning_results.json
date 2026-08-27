@@ -1,0 +1,67 @@
+{
+  "rows": 3791,
+  "features": 32,
+  "target_strategy": "price_per_square_foot",
+  "selection": "minimum combined total-price RMSE and MAE rank",
+  "results": {
+    "Extra Trees": {
+      "parameters": {
+        "regressor__preprocessor__categorical__target_encoder__smooth": "auto",
+        "regressor__model__n_estimators": 700,
+        "regressor__model__min_samples_split": 6,
+        "regressor__model__min_samples_leaf": 3,
+        "regressor__model__max_features": 0.7,
+        "regressor__model__max_depth": 24,
+        "regressor__model__criterion": "squared_error",
+        "regressor__model__bootstrap": false,
+        "regressor__model__n_jobs": -1
+      },
+      "metrics": {
+        "RMSE": 127117.52754573565,
+        "MAE": 63588.772332368324,
+        "median_absolute_error": 34501.944102602894,
+        "within_RM_1000_rate": 0.019783698232656292,
+        "R2": 0.8513410514203545
+      }
+    },
+    "Random Forest": {
+      "parameters": {
+        "regressor__preprocessor__categorical__target_encoder__smooth": "auto",
+        "regressor__model__n_estimators": 700,
+        "regressor__model__min_samples_split": 6,
+        "regressor__model__min_samples_leaf": 3,
+        "regressor__model__max_features": 0.7,
+        "regressor__model__max_depth": 24,
+        "regressor__model__criterion": "squared_error",
+        "regressor__model__bootstrap": true,
+        "regressor__model__n_jobs": -1
+      },
+      "metrics": {
+        "RMSE": 125661.0380107831,
+        "MAE": 62607.40377780881,
+        "median_absolute_error": 33718.0702948494,
+        "within_RM_1000_rate": 0.021102611448166712,
+        "R2": 0.8547281496823631
+      }
+    },
+    "Histogram Gradient Boosting": {
+      "parameters": {
+        "regressor__preprocessor__categorical__target_encoder__smooth": "auto",
+        "regressor__model__min_samples_leaf": 40,
+        "regressor__model__max_leaf_nodes": 15,
+        "regressor__model__max_iter": 200,
+        "regressor__model__max_depth": 6,
+        "regressor__model__loss": "poisson",
+        "regressor__model__learning_rate": 0.075,
+        "regressor__model__l2_regularization": 10.0
+      },
+      "metrics": {
+        "RMSE": 130180.59287265649,
+        "MAE": 65327.65765927217,
+        "median_absolute_error": 36429.49814191699,
+        "within_RM_1000_rate": 0.015299393299920866,
+        "R2": 0.844090466301231
+      }
+    }
+  }
+}

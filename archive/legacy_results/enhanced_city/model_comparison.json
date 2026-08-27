@@ -1,0 +1,270 @@
+{
+  "dataset": "data\\processed\\enhanced_city_dataset.csv",
+  "dataset_sha256": "4a295007fc5fdf6def33a612797606dfb60d811e7b19ade930466033a1fd66cf",
+  "dataset_profile": {
+    "rows": 3791,
+    "columns": 34,
+    "missing_values_total": 7264,
+    "missing_values_by_column": {
+      "completion_year": 1905,
+      "property_age": 1905,
+      "number_of_floors": 1657,
+      "total_units": 1797
+    },
+    "duplicate_rows": 0,
+    "duplicate_model_rows_excluding_id": 23,
+    "numerical_columns": [
+      "property_size_sqft",
+      "bedroom",
+      "bathroom",
+      "parking_lot",
+      "facilities_count",
+      "has_school",
+      "has_mall",
+      "has_hospital",
+      "has_railway",
+      "has_bus_stop",
+      "has_park",
+      "has_highway",
+      "completion_year",
+      "property_age",
+      "number_of_floors",
+      "total_units",
+      "description_length",
+      "has_swimming_pool",
+      "has_security",
+      "has_lift",
+      "has_gym",
+      "has_playground",
+      "is_furnished",
+      "is_renovated"
+    ],
+    "categorical_columns": [
+      "property_type",
+      "tenure_type",
+      "land_title",
+      "floor_range",
+      "state",
+      "building_name",
+      "developer",
+      "city"
+    ],
+    "model_features": [
+      "property_size_sqft",
+      "bedroom",
+      "bathroom",
+      "parking_lot",
+      "facilities_count",
+      "has_school",
+      "has_mall",
+      "has_hospital",
+      "has_railway",
+      "has_bus_stop",
+      "has_park",
+      "has_highway",
+      "completion_year",
+      "property_age",
+      "number_of_floors",
+      "total_units",
+      "description_length",
+      "has_swimming_pool",
+      "has_security",
+      "has_lift",
+      "has_gym",
+      "has_playground",
+      "is_furnished",
+      "is_renovated",
+      "property_type",
+      "tenure_type",
+      "land_title",
+      "floor_range",
+      "state",
+      "building_name",
+      "developer",
+      "city"
+    ],
+    "target_distribution": {
+      "count": 3791,
+      "mean": 423016.30994460563,
+      "std": 329736.63074735354,
+      "min": 38000.0,
+      "p25": 250000.0,
+      "median": 350000.0,
+      "p75": 490000.0,
+      "p95": 905000.0,
+      "max": 6016000.0,
+      "skew": 5.2899451800586865
+    },
+    "property_size_distribution": {
+      "count": 3791,
+      "mean": 996.5050751780533,
+      "std": 458.2023234543722,
+      "min": 280.0,
+      "p25": 750.0,
+      "median": 901.0,
+      "p75": 1116.0,
+      "p95": 1645.0,
+      "max": 9800.0,
+      "skew": 5.414569764202894
+    },
+    "city_unique_count": 149
+  },
+  "target_column": "price",
+  "target_strategy": "price_per_square_foot",
+  "model_features": [
+    "property_size_sqft",
+    "bedroom",
+    "bathroom",
+    "parking_lot",
+    "facilities_count",
+    "has_school",
+    "has_mall",
+    "has_hospital",
+    "has_railway",
+    "has_bus_stop",
+    "has_park",
+    "has_highway",
+    "completion_year",
+    "property_age",
+    "number_of_floors",
+    "total_units",
+    "description_length",
+    "has_swimming_pool",
+    "has_security",
+    "has_lift",
+    "has_gym",
+    "has_playground",
+    "is_furnished",
+    "is_renovated",
+    "property_type",
+    "tenure_type",
+    "land_title",
+    "floor_range",
+    "state",
+    "building_name",
+    "developer",
+    "city"
+  ],
+  "numerical_features": [
+    "property_size_sqft",
+    "bedroom",
+    "bathroom",
+    "parking_lot",
+    "facilities_count",
+    "has_school",
+    "has_mall",
+    "has_hospital",
+    "has_railway",
+    "has_bus_stop",
+    "has_park",
+    "has_highway",
+    "completion_year",
+    "property_age",
+    "number_of_floors",
+    "total_units",
+    "description_length",
+    "has_swimming_pool",
+    "has_security",
+    "has_lift",
+    "has_gym",
+    "has_playground",
+    "is_furnished",
+    "is_renovated"
+  ],
+  "categorical_features": [
+    "property_type",
+    "tenure_type",
+    "land_title",
+    "floor_range",
+    "state",
+    "building_name",
+    "developer",
+    "city"
+  ],
+  "cross_validation": {
+    "type": "KFold",
+    "n_splits": 5,
+    "shuffle": true,
+    "random_state": 42,
+    "shared_fold_indices": true
+  },
+  "preprocessing": {
+    "fit_on_training_fold_only": true,
+    "numerical_imputation": "median",
+    "categorical_imputation": "most_frequent",
+    "categorical_encoding": "TargetEncoder with fixed inner folds",
+    "scaled_numerical_models": [
+      "Ridge Regression",
+      "KNN"
+    ]
+  },
+  "model_parameters": {
+    "Ridge Regression": {
+      "alpha": 10.0
+    },
+    "Random Forest": {
+      "n_estimators": 700,
+      "min_samples_split": 6,
+      "min_samples_leaf": 3,
+      "max_features": 0.7,
+      "max_depth": 24,
+      "criterion": "squared_error",
+      "bootstrap": true,
+      "random_state": 42,
+      "n_jobs": -1
+    },
+    "Gradient Boosting": {
+      "learning_rate": 0.1,
+      "max_depth": 5,
+      "n_estimators": 200
+    },
+    "KNN": {
+      "n_neighbors": 9,
+      "weights": "distance"
+    }
+  },
+  "results": {
+    "Random Forest": {
+      "R2": 0.8598720018371101,
+      "Adjusted_R2": 0.8586787884413644,
+      "MAE_RM": 61217.27428950846,
+      "RMSE_RM": 123416.25608940292,
+      "Median_AE_RM": 32924.28841907636
+    },
+    "Gradient Boosting": {
+      "R2": 0.8348681417287795,
+      "Adjusted_R2": 0.8334620162725052,
+      "MAE_RM": 64225.231615964374,
+      "RMSE_RM": 133975.48652834768,
+      "Median_AE_RM": 34827.45976108452
+    },
+    "KNN": {
+      "R2": 0.8206478568447475,
+      "Adjusted_R2": 0.8191206432787634,
+      "MAE_RM": 70775.29981602273,
+      "RMSE_RM": 139625.00255675465,
+      "Median_AE_RM": 38084.642487370234
+    },
+    "Ridge Regression": {
+      "R2": 0.8012927133570733,
+      "Adjusted_R2": 0.7996006874995497,
+      "MAE_RM": 76326.10907681377,
+      "RMSE_RM": 146965.97673322752,
+      "Median_AE_RM": 47574.98748243929
+    }
+  },
+  "selection": {
+    "best_rmse_model": "Random Forest",
+    "best_mae_model": "Random Forest",
+    "best_r2_model": "Random Forest",
+    "best_adjusted_r2_model": "Random Forest",
+    "best_median_ae_model": "Random Forest",
+    "metric_win_counts": {
+      "Ridge Regression": 0,
+      "Random Forest": 5,
+      "Gradient Boosting": 0,
+      "KNN": 0
+    },
+    "best_overall_model": "Random Forest"
+  }
+}

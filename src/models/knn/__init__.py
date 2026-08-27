@@ -1,0 +1,6 @@
+"""K-Nearest Neighbors model construction and tuning configuration."""
+
+from .model import build_model
+
+__all__ = ["build_model"]
+

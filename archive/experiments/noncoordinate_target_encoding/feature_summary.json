@@ -1,0 +1,159 @@
+{
+  "coordinate_based_features_used": false,
+  "coordinate_columns_present": [],
+  "raw_metadata_excluded": [
+    "Ad List",
+    "Firm Type",
+    "Firm Number",
+    "REN Number",
+    "Category"
+  ],
+  "canonical_numerical_features": [
+    "property_size_sqft",
+    "bedroom",
+    "bathroom",
+    "parking_lot",
+    "facilities_count",
+    "has_school",
+    "has_mall",
+    "has_hospital",
+    "has_railway",
+    "has_bus_stop",
+    "has_park",
+    "has_highway",
+    "completion_year",
+    "property_age",
+    "number_of_floors",
+    "total_units",
+    "description_length",
+    "has_swimming_pool",
+    "has_security",
+    "has_lift",
+    "has_gym",
+    "has_playground",
+    "is_furnished",
+    "is_renovated"
+  ],
+  "canonical_categorical_features": [
+    "property_type",
+    "tenure_type",
+    "land_title",
+    "floor_range",
+    "state",
+    "building_name",
+    "developer",
+    "city"
+  ],
+  "preserved_deterministic_interactions": [
+    "size_band",
+    "state_property_type",
+    "city_property_type",
+    "city_tenure_type",
+    "city_building_name",
+    "city_developer",
+    "city_size_band",
+    "property_type_size_band"
+  ],
+  "explicit_te_columns": [
+    "building_name",
+    "developer",
+    "city"
+  ],
+  "te_target": "outer-training PPSF",
+  "smoothing_values": [
+    5.0,
+    10.0,
+    20.0,
+    50.0,
+    100.0
+  ],
+  "count_features": [
+    "building_count",
+    "log_building_count",
+    "developer_count",
+    "log_developer_count",
+    "city_count",
+    "log_city_count"
+  ],
+  "city_context_features": [
+    "city_median_sqft",
+    "city_mean_sqft",
+    "city_median_bedroom",
+    "city_median_bathroom",
+    "city_property_count",
+    "ratio_to_city_median_sqft"
+  ],
+  "city_context_target_derived": false,
+  "micro_market_target_aggregates_used": false,
+  "feature_variants": {
+    "baseline_lightgbm": {
+      "te_columns": [],
+      "add_counts": false,
+      "add_city_aggregates": false
+    },
+    "building_name_te": {
+      "te_columns": [
+        "building_name"
+      ],
+      "add_counts": false,
+      "add_city_aggregates": false
+    },
+    "developer_te": {
+      "te_columns": [
+        "developer"
+      ],
+      "add_counts": false,
+      "add_city_aggregates": false
+    },
+    "city_te": {
+      "te_columns": [
+        "city"
+      ],
+      "add_counts": false,
+      "add_city_aggregates": false
+    },
+    "building_developer_te": {
+      "te_columns": [
+        "building_name",
+        "developer"
+      ],
+      "add_counts": false,
+      "add_city_aggregates": false
+    },
+    "combined_te": {
+      "te_columns": [
+        "building_name",
+        "developer",
+        "city"
+      ],
+      "add_counts": false,
+      "add_city_aggregates": false
+    },
+    "combined_te_frequency": {
+      "te_columns": [
+        "building_name",
+        "developer",
+        "city"
+      ],
+      "add_counts": true,
+      "add_city_aggregates": false
+    },
+    "combined_te_frequency_city_context": {
+      "te_columns": [
+        "building_name",
+        "developer",
+        "city"
+      ],
+      "add_counts": true,
+      "add_city_aggregates": true
+    }
+  },
+  "loss_feature_set_selection": "pre-specified building_name_te from protected preceding experiment",
+  "native_objectives_tested": {
+    "regression": "MSE / L2",
+    "regression_l1": "MAE / L1",
+    "huber": "Huber",
+    "fair": "Fair"
+  },
+  "log_cosh_status": "skipped_not_needed_custom_objective"
+}

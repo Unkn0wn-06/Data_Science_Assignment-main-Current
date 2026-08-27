@@ -1,0 +1,466 @@
+{
+  "regex_indicator_count": 44,
+  "modeling_minimum_count": 10,
+  "regex_retained_count": 33,
+  "retained_regex_features": [
+    "is_penthouse",
+    "is_duplex_text",
+    "is_dual_key",
+    "is_studio_text",
+    "is_corner_unit",
+    "is_end_lot_text",
+    "has_private_lift",
+    "is_luxury_text",
+    "is_premium_text",
+    "is_exclusive_text",
+    "is_luxurious_text",
+    "has_sea_view",
+    "has_city_view",
+    "has_klcc_view",
+    "has_pool_view",
+    "has_golf_view",
+    "has_unblocked_view",
+    "is_high_floor_text",
+    "is_low_floor_text",
+    "is_top_floor_text",
+    "has_balcony",
+    "has_large_balcony",
+    "is_fully_furnished_text",
+    "is_partly_furnished_text",
+    "is_unfurnished_text",
+    "is_fully_renovated_text",
+    "has_kitchen_cabinet",
+    "has_built_in_wardrobe",
+    "has_air_conditioning",
+    "is_below_market",
+    "is_owner_listing",
+    "is_tenanted",
+    "is_vacant"
+  ],
+  "groups": {
+    "layout": {
+      "defined": [
+        "is_penthouse",
+        "is_duplex_text",
+        "is_triplex",
+        "is_loft",
+        "is_dual_key",
+        "is_studio_text",
+        "is_corner_unit",
+        "is_end_lot_text",
+        "is_garden_unit"
+      ],
+      "retained": [
+        "is_penthouse",
+        "is_duplex_text",
+        "is_dual_key",
+        "is_studio_text",
+        "is_corner_unit",
+        "is_end_lot_text"
+      ]
+    },
+    "private_luxury": {
+      "defined": [
+        "has_private_lift",
+        "has_private_lift_lobby",
+        "has_private_pool",
+        "has_private_garden",
+        "has_private_entrance",
+        "is_luxury_text",
+        "is_premium_text",
+        "is_exclusive_text",
+        "is_luxurious_text",
+        "is_branded_residence"
+      ],
+      "retained": [
+        "has_private_lift",
+        "is_luxury_text",
+        "is_premium_text",
+        "is_exclusive_text",
+        "is_luxurious_text"
+      ]
+    },
+    "views": {
+      "defined": [
+        "has_sea_view",
+        "has_city_view",
+        "has_klcc_view",
+        "has_pool_view",
+        "has_golf_view",
+        "has_unblocked_view",
+        "has_panorama_view"
+      ],
+      "retained": [
+        "has_sea_view",
+        "has_city_view",
+        "has_klcc_view",
+        "has_pool_view",
+        "has_golf_view",
+        "has_unblocked_view"
+      ]
+    },
+    "position": {
+      "defined": [
+        "is_high_floor_text",
+        "is_low_floor_text",
+        "is_top_floor_text",
+        "has_balcony",
+        "has_large_balcony"
+      ],
+      "retained": [
+        "is_high_floor_text",
+        "is_low_floor_text",
+        "is_top_floor_text",
+        "has_balcony",
+        "has_large_balcony"
+      ]
+    },
+    "renovation_furnishing": {
+      "defined": [
+        "is_fully_furnished_text",
+        "is_partly_furnished_text",
+        "is_unfurnished_text",
+        "is_fully_renovated_text",
+        "is_designer_unit",
+        "has_kitchen_cabinet",
+        "has_built_in_wardrobe",
+        "has_air_conditioning"
+      ],
+      "retained": [
+        "is_fully_furnished_text",
+        "is_partly_furnished_text",
+        "is_unfurnished_text",
+        "is_fully_renovated_text",
+        "has_kitchen_cabinet",
+        "has_built_in_wardrobe",
+        "has_air_conditioning"
+      ]
+    },
+    "sale_context": {
+      "defined": [
+        "is_urgent_sale",
+        "is_below_market",
+        "is_owner_listing",
+        "is_tenanted",
+        "is_vacant"
+      ],
+      "retained": [
+        "is_below_market",
+        "is_owner_listing",
+        "is_tenanted",
+        "is_vacant"
+      ]
+    }
+  },
+  "tfidf_word_parameters": {
+    "lowercase": true,
+    "strip_accents": "unicode",
+    "ngram_range": [
+      1,
+      2
+    ],
+    "min_df": 5,
+    "max_df": 0.95,
+    "max_features": 5000,
+    "sublinear_tf": true
+  },
+  "svd_counts_tested": [
+    10,
+    20,
+    30,
+    50
+  ],
+  "nested_component_selection": [
+    {
+      "fold": 1,
+      "selected_components": 10,
+      "inner_RMSE_RM": {
+        "10": 127549.34326115756,
+        "20": 129931.58966385096,
+        "30": 130108.63554059043,
+        "50": 132420.66446962766
+      }
+    },
+    {
+      "fold": 2,
+      "selected_components": 20,
+      "inner_RMSE_RM": {
+        "10": 140926.1528071071,
+        "20": 140193.2097730207,
+        "30": 141060.00883485173,
+        "50": 144110.38123312267
+      }
+    },
+    {
+      "fold": 3,
+      "selected_components": 30,
+      "inner_RMSE_RM": {
+        "10": 134757.53982377882,
+        "20": 136626.73077585275,
+        "30": 134162.85752076382,
+        "50": 137083.6585450067
+      }
+    },
+    {
+      "fold": 4,
+      "selected_components": 20,
+      "inner_RMSE_RM": {
+        "10": 138314.2219557776,
+        "20": 133751.56563282319,
+        "30": 135226.65312172004,
+        "50": 134493.45878884167
+      }
+    },
+    {
+      "fold": 5,
+      "selected_components": 50,
+      "inner_RMSE_RM": {
+        "10": 134044.18094730008,
+        "20": 132996.2936936352,
+        "30": 133818.9168723776,
+        "50": 132082.8698610226
+      }
+    }
+  ],
+  "feature_importance_variant": "regex_svd_building_te_nested",
+  "feature_importance": {
+    "structured": [
+      {
+        "feature": "property_size_sqft",
+        "feature_family": "structured",
+        "importance": 1725.4
+      },
+      {
+        "feature": "property_type_size_band",
+        "feature_family": "structured",
+        "importance": 1191.8
+      },
+      {
+        "feature": "developer",
+        "feature_family": "structured",
+        "importance": 977.2
+      },
+      {
+        "feature": "city_size_band",
+        "feature_family": "structured",
+        "importance": 856.4
+      },
+      {
+        "feature": "city_building_name",
+        "feature_family": "structured",
+        "importance": 806.0
+      },
+      {
+        "feature": "city_property_type",
+        "feature_family": "structured",
+        "importance": 802.6
+      },
+      {
+        "feature": "description_length",
+        "feature_family": "structured",
+        "importance": 800.8
+      },
+      {
+        "feature": "city_developer",
+        "feature_family": "structured",
+        "importance": 791.8
+      },
+      {
+        "feature": "city_tenure_type",
+        "feature_family": "structured",
+        "importance": 650.8
+      },
+      {
+        "feature": "state_property_type",
+        "feature_family": "structured",
+        "importance": 600.8
+      },
+      {
+        "feature": "floor_range",
+        "feature_family": "structured",
+        "importance": 509.4
+      },
+      {
+        "feature": "total_units",
+        "feature_family": "structured",
+        "importance": 500.4
+      },
+      {
+        "feature": "city",
+        "feature_family": "structured",
+        "importance": 446.4
+      },
+      {
+        "feature": "size_band",
+        "feature_family": "structured",
+        "importance": 432.4
+      },
+      {
+        "feature": "number_of_floors",
+        "feature_family": "structured",
+        "importance": 411.2
+      }
+    ],
+    "regex": [
+      {
+        "feature": "is_luxury_text",
+        "feature_family": "regex",
+        "importance": 126.2
+      },
+      {
+        "feature": "is_fully_furnished_text",
+        "feature_family": "regex",
+        "importance": 123.0
+      },
+      {
+        "feature": "is_duplex_text",
+        "feature_family": "regex",
+        "importance": 58.8
+      },
+      {
+        "feature": "is_studio_text",
+        "feature_family": "regex",
+        "importance": 54.8
+      },
+      {
+        "feature": "is_fully_renovated_text",
+        "feature_family": "regex",
+        "importance": 24.2
+      },
+      {
+        "feature": "has_balcony",
+        "feature_family": "regex",
+        "importance": 23.6
+      },
+      {
+        "feature": "is_below_market",
+        "feature_family": "regex",
+        "importance": 21.4
+      },
+      {
+        "feature": "has_kitchen_cabinet",
+        "feature_family": "regex",
+        "importance": 18.0
+      },
+      {
+        "feature": "is_top_floor_text",
+        "feature_family": "regex",
+        "importance": 16.8
+      },
+      {
+        "feature": "has_sea_view",
+        "feature_family": "regex",
+        "importance": 15.0
+      },
+      {
+        "feature": "is_high_floor_text",
+        "feature_family": "regex",
+        "importance": 12.0
+      },
+      {
+        "feature": "has_air_conditioning",
+        "feature_family": "regex",
+        "importance": 11.4
+      },
+      {
+        "feature": "is_unfurnished_text",
+        "feature_family": "regex",
+        "importance": 10.8
+      },
+      {
+        "feature": "is_dual_key",
+        "feature_family": "regex",
+        "importance": 10.6
+      },
+      {
+        "feature": "is_partly_furnished_text",
+        "feature_family": "regex",
+        "importance": 10.0
+      }
+    ],
+    "svd": [
+      {
+        "feature": "description_svd_08",
+        "feature_family": "svd",
+        "importance": 681.8
+      },
+      {
+        "feature": "description_svd_01",
+        "feature_family": "svd",
+        "importance": 676.8
+      },
+      {
+        "feature": "description_svd_07",
+        "feature_family": "svd",
+        "importance": 670.6
+      },
+      {
+        "feature": "description_svd_06",
+        "feature_family": "svd",
+        "importance": 651.0
+      },
+      {
+        "feature": "description_svd_20",
+        "feature_family": "svd",
+        "importance": 629.75
+      },
+      {
+        "feature": "description_svd_10",
+        "feature_family": "svd",
+        "importance": 622.0
+      },
+      {
+        "feature": "description_svd_09",
+        "feature_family": "svd",
+        "importance": 617.8
+      },
+      {
+        "feature": "description_svd_04",
+        "feature_family": "svd",
+        "importance": 611.4
+      },
+      {
+        "feature": "description_svd_19",
+        "feature_family": "svd",
+        "importance": 607.75
+      },
+      {
+        "feature": "description_svd_17",
+        "feature_family": "svd",
+        "importance": 576.0
+      },
+      {
+        "feature": "description_svd_18",
+        "feature_family": "svd",
+        "importance": 574.0
+      },
+      {
+        "feature": "description_svd_15",
+        "feature_family": "svd",
+        "importance": 566.25
+      },
+      {
+        "feature": "description_svd_13",
+        "feature_family": "svd",
+        "importance": 559.5
+      },
+      {
+        "feature": "description_svd_03",
+        "feature_family": "svd",
+        "importance": 554.6
+      },
+      {
+        "feature": "description_svd_05",
+        "feature_family": "svd",
+        "importance": 549.4
+      }
+    ],
+    "building_te": [
+      {
+        "feature": "building_name_te",
+        "feature_family": "building_te",
+        "importance": 637.8
+      }
+    ]
+  }
+}

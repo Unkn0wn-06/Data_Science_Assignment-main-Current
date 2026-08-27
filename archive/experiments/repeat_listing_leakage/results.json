@@ -1,0 +1,746 @@
+{
+  "question": "Are repeat-like listings leaking across historical CV folds, and does Position-regex remain strongest under group-safe CV?",
+  "dataset": {
+    "path": "data/processed/enhanced_city_dataset.csv",
+    "rows": 3791,
+    "unique_listing_ids": 3791,
+    "sha256": "4a295007fc5fdf6def33a612797606dfb60d811e7b19ade930466033a1fd66cf",
+    "rows_removed_as_repeats": 0
+  },
+  "description_linkage": {
+    "linkage_method": "replay canonical cleaning pipeline, then exact Ad List == listing_id order assertion",
+    "fuzzy_join_used": false,
+    "raw_rows": 4000,
+    "cleaned_raw_rows": 3791,
+    "canonical_rows": 3791,
+    "linked_rows": 3791,
+    "unique_canonical_ids": 3791,
+    "unique_cleaned_raw_ids": 3791,
+    "missing_description_count": 0,
+    "many_to_many_join": false,
+    "exact_order_match": true,
+    "rows_reintroduced": 0
+  },
+  "repeat_audit": {
+    "level_definitions_are_inclusive": true,
+    "level1_exact_duplicate_groups": 22,
+    "level1_exact_duplicate_rows": 45,
+    "level1_duplicate_rows_beyond_one_per_group": 23,
+    "level2_strong_repeat_groups": 27,
+    "level2_strong_repeat_rows": 57,
+    "level3_possible_repeat_groups": 234,
+    "level3_possible_repeat_rows": 500,
+    "total_repeat_groups_used_for_cv": 234,
+    "total_repeat_like_rows": 500,
+    "groups_crossing_historical_folds": 202,
+    "rows_in_cross_fold_repeat_groups": 436,
+    "fuzzy_matching_used": false,
+    "rows_deleted_as_repeats": 0
+  },
+  "historical_position_repeat_vs_non_repeat": {
+    "repeat_like_rows": {
+      "count": 500,
+      "RMSE_RM": 48916.06383889913,
+      "MAE_RM": 30578.570124590675,
+      "Median_AE_RM": 21251.875910591247,
+      "R2": 0.9503435749223489
+    },
+    "non_repeat_rows": {
+      "count": 3291,
+      "RMSE_RM": 126017.95415354297,
+      "MAE_RM": 65584.02544990437,
+      "Median_AE_RM": 35468.81582788273,
+      "R2": 0.8652821798272555
+    }
+  },
+  "group_safe_position_repeat_vs_non_repeat": {
+    "repeat_like_rows": {
+      "count": 500,
+      "RMSE_RM": 86172.76138375023,
+      "MAE_RM": 49382.39981498069,
+      "Median_AE_RM": 29373.812826900714,
+      "R2": 0.8458965136928138
+    },
+    "non_repeat_rows": {
+      "count": 3291,
+      "RMSE_RM": 137412.39711269183,
+      "MAE_RM": 69335.37168009215,
+      "Median_AE_RM": 37009.98648299585,
+      "R2": 0.8398186206538593
+    }
+  },
+  "position_segmented_old_to_group_safe_changes": {
+    "repeat_like_rows": {
+      "RMSE_change_RM": 37256.6975448511,
+      "MAE_change_RM": 18803.829690390012,
+      "Median_AE_change_RM": 8121.936916309467
+    },
+    "non_repeat_rows": {
+      "RMSE_change_RM": 11394.442959148859,
+      "MAE_change_RM": 3751.346230187788,
+      "Median_AE_change_RM": 1541.170655113121
+    }
+  },
+  "group_safe_cv": {
+    "splitter": "sklearn.model_selection.GroupKFold(n_splits=5, shuffle=True, random_state=42)",
+    "fold_sizes": {
+      "1": 769,
+      "2": 746,
+      "3": 755,
+      "4": 765,
+      "5": 756
+    },
+    "repeat_groups_crossing_folds": 0,
+    "all_models_use_identical_folds": true
+  },
+  "models": {
+    "random_forest": {
+      "old_cv": {
+        "count": 3791,
+        "RMSE_RM": 123416.25608940294,
+        "MAE_RM": 61217.27428950846,
+        "Median_AE_RM": 32924.28841907636,
+        "R2": 0.85987200183711,
+        "Adjusted_R2": 0.8586787884413642,
+        "Top5_count": 190,
+        "Top5_RMSE_RM": 437137.8158097914,
+        "Top5_MAE_RM": 294346.1151562098,
+        "P95_P99_count": 151,
+        "P95_P99_RMSE_RM": 310389.74429233535,
+        "P95_P99_MAE_RM": 225977.61205094735,
+        "P99_P100_count": 39,
+        "P99_P100_RMSE_RM": 746949.1539424857,
+        "P99_P100_MAE_RM": 559054.9348714566
+      },
+      "group_safe_cv": {
+        "count": 3791,
+        "RMSE_RM": 139493.56019003675,
+        "MAE_RM": 67009.81840803406,
+        "Median_AE_RM": 35709.791239027516,
+        "R2": 0.8209853805445035,
+        "Adjusted_R2": 0.8194610410494062,
+        "Top5_count": 190,
+        "Top5_RMSE_RM": 508683.37063856877,
+        "Top5_MAE_RM": 335608.73277740524,
+        "P95_P99_count": 151,
+        "P95_P99_RMSE_RM": 345178.12668925617,
+        "P95_P99_MAE_RM": 241600.60550394337,
+        "P99_P100_count": 39,
+        "P99_P100_RMSE_RM": 894037.6259269477,
+        "P99_P100_MAE_RM": 699588.9178618343
+      }
+    },
+    "lightgbm_interaction": {
+      "old_cv": {
+        "count": 3791,
+        "RMSE_RM": 120372.50720563732,
+        "MAE_RM": 61398.96552303073,
+        "Median_AE_RM": 32756.79514097757,
+        "R2": 0.866698574008528,
+        "Adjusted_R2": 0.865204801358677,
+        "Top5_count": 190,
+        "Top5_RMSE_RM": 420311.5104220744,
+        "Top5_MAE_RM": 295732.30946059735,
+        "P95_P99_count": 151,
+        "P95_P99_RMSE_RM": 317840.2626395696,
+        "P95_P99_MAE_RM": 238885.1326253187,
+        "P99_P100_count": 39,
+        "P99_P100_RMSE_RM": 685216.5703863808,
+        "P99_P100_MAE_RM": 515832.9172074453
+      },
+      "group_safe_cv": {
+        "count": 3791,
+        "RMSE_RM": 132451.28841558326,
+        "MAE_RM": 66829.1544988059,
+        "Median_AE_RM": 35978.41040637143,
+        "R2": 0.8386040780900653,
+        "Adjusted_R2": 0.8367954791785879,
+        "Top5_count": 190,
+        "Top5_RMSE_RM": 461306.31867965683,
+        "Top5_MAE_RM": 316356.37038695277,
+        "P95_P99_count": 151,
+        "P95_P99_RMSE_RM": 333522.28407309554,
+        "P95_P99_MAE_RM": 245199.1212800608,
+        "P99_P100_count": 39,
+        "P99_P100_RMSE_RM": 778490.7246165184,
+        "P99_P100_MAE_RM": 591862.6425700473
+      }
+    },
+    "building_name_te": {
+      "old_cv": {
+        "count": 3791,
+        "RMSE_RM": 120201.22007355573,
+        "MAE_RM": 61613.19807437313,
+        "Median_AE_RM": 32652.10208560177,
+        "R2": 0.8670776734261412,
+        "Adjusted_R2": 0.8655881489554629,
+        "Top5_count": 190,
+        "Top5_RMSE_RM": 418749.3874791527,
+        "Top5_MAE_RM": 294819.8269345541,
+        "P95_P99_count": 151,
+        "P95_P99_RMSE_RM": 321007.7322299182,
+        "P95_P99_MAE_RM": 241188.61422094668,
+        "P99_P100_count": 39,
+        "P99_P100_RMSE_RM": 674760.3339160001,
+        "P99_P100_MAE_RM": 502468.8812872389
+      },
+      "group_safe_cv": {
+        "count": 3791,
+        "RMSE_RM": 132741.8433922035,
+        "MAE_RM": 67014.93047828709,
+        "Median_AE_RM": 36805.72645207739,
+        "R2": 0.8378952012737799,
+        "Adjusted_R2": 0.836078658705343,
+        "Top5_count": 190,
+        "Top5_RMSE_RM": 464349.0249342438,
+        "Top5_MAE_RM": 317499.44931975816,
+        "P95_P99_count": 151,
+        "P95_P99_RMSE_RM": 337733.85147457424,
+        "P95_P99_MAE_RM": 248891.43213259394,
+        "P99_P100_count": 39,
+        "P99_P100_RMSE_RM": 780271.4173186452,
+        "P99_P100_MAE_RM": 583135.6184290352
+      }
+    },
+    "position_regex_lightgbm": {
+      "old_cv": {
+        "count": 3791,
+        "RMSE_RM": 118750.19350875785,
+        "MAE_RM": 60967.10968555279,
+        "Median_AE_RM": 32559.579623052035,
+        "R2": 0.8702674858843791,
+        "Adjusted_R2": 0.8686384642003198,
+        "Top5_count": 190,
+        "Top5_RMSE_RM": 412319.68890075386,
+        "Top5_MAE_RM": 291219.0401045874,
+        "P95_P99_count": 151,
+        "P95_P99_RMSE_RM": 314958.7752133207,
+        "P95_P99_MAE_RM": 238293.4494681764,
+        "P99_P100_count": 39,
+        "P99_P100_RMSE_RM": 666455.9225201581,
+        "P99_P100_MAE_RM": 496136.0705173581
+      },
+      "group_safe_cv": {
+        "count": 3791,
+        "RMSE_RM": 131799.71256584063,
+        "MAE_RM": 66703.74785193184,
+        "Median_AE_RM": 35991.539170052856,
+        "R2": 0.8401881022549351,
+        "Adjusted_R2": 0.8381813805894214,
+        "Top5_count": 190,
+        "Top5_RMSE_RM": 457821.3232990301,
+        "Top5_MAE_RM": 315276.99819459306,
+        "P95_P99_count": 151,
+        "P95_P99_RMSE_RM": 328757.63094666187,
+        "P95_P99_MAE_RM": 242541.53276562208,
+        "P99_P100_count": 39,
+        "P99_P100_RMSE_RM": 776311.9682029,
+        "P99_P100_MAE_RM": 596893.8002400963
+      }
+    }
+  },
+  "old_vs_group_safe": [
+    {
+      "model": "random_forest",
+      "old_count": 3791,
+      "old_RMSE_RM": 123416.25608940294,
+      "old_MAE_RM": 61217.27428950846,
+      "old_Median_AE_RM": 32924.28841907636,
+      "old_R2": 0.85987200183711,
+      "old_Adjusted_R2": 0.8586787884413642,
+      "old_Top5_count": 190,
+      "old_Top5_RMSE_RM": 437137.8158097914,
+      "old_Top5_MAE_RM": 294346.1151562098,
+      "old_P95_P99_count": 151,
+      "old_P95_P99_RMSE_RM": 310389.74429233535,
+      "old_P95_P99_MAE_RM": 225977.61205094735,
+      "old_P99_P100_count": 39,
+      "old_P99_P100_RMSE_RM": 746949.1539424857,
+      "old_P99_P100_MAE_RM": 559054.9348714566,
+      "group_safe_count": 3791,
+      "group_safe_RMSE_RM": 139493.56019003675,
+      "group_safe_MAE_RM": 67009.81840803406,
+      "group_safe_Median_AE_RM": 35709.791239027516,
+      "group_safe_R2": 0.8209853805445035,
+      "group_safe_Adjusted_R2": 0.8194610410494062,
+      "group_safe_Top5_count": 190,
+      "group_safe_Top5_RMSE_RM": 508683.37063856877,
+      "group_safe_Top5_MAE_RM": 335608.73277740524,
+      "group_safe_P95_P99_count": 151,
+      "group_safe_P95_P99_RMSE_RM": 345178.12668925617,
+      "group_safe_P95_P99_MAE_RM": 241600.60550394337,
+      "group_safe_P99_P100_count": 39,
+      "group_safe_P99_P100_RMSE_RM": 894037.6259269477,
+      "group_safe_P99_P100_MAE_RM": 699588.9178618343,
+      "rmse_change_RM": 16077.304100633803,
+      "mae_change_RM": 5792.544118525599,
+      "group_safe_rmse_rank": 4,
+      "group_safe_mae_rank": 3
+    },
+    {
+      "model": "lightgbm_interaction",
+      "old_count": 3791,
+      "old_RMSE_RM": 120372.50720563732,
+      "old_MAE_RM": 61398.96552303073,
+      "old_Median_AE_RM": 32756.79514097757,
+      "old_R2": 0.866698574008528,
+      "old_Adjusted_R2": 0.865204801358677,
+      "old_Top5_count": 190,
+      "old_Top5_RMSE_RM": 420311.5104220744,
+      "old_Top5_MAE_RM": 295732.30946059735,
+      "old_P95_P99_count": 151,
+      "old_P95_P99_RMSE_RM": 317840.2626395696,
+      "old_P95_P99_MAE_RM": 238885.1326253187,
+      "old_P99_P100_count": 39,
+      "old_P99_P100_RMSE_RM": 685216.5703863808,
+      "old_P99_P100_MAE_RM": 515832.9172074453,
+      "group_safe_count": 3791,
+      "group_safe_RMSE_RM": 132451.28841558326,
+      "group_safe_MAE_RM": 66829.1544988059,
+      "group_safe_Median_AE_RM": 35978.41040637143,
+      "group_safe_R2": 0.8386040780900653,
+      "group_safe_Adjusted_R2": 0.8367954791785879,
+      "group_safe_Top5_count": 190,
+      "group_safe_Top5_RMSE_RM": 461306.31867965683,
+      "group_safe_Top5_MAE_RM": 316356.37038695277,
+      "group_safe_P95_P99_count": 151,
+      "group_safe_P95_P99_RMSE_RM": 333522.28407309554,
+      "group_safe_P95_P99_MAE_RM": 245199.1212800608,
+      "group_safe_P99_P100_count": 39,
+      "group_safe_P99_P100_RMSE_RM": 778490.7246165184,
+      "group_safe_P99_P100_MAE_RM": 591862.6425700473,
+      "rmse_change_RM": 12078.78120994594,
+      "mae_change_RM": 5430.188975775171,
+      "group_safe_rmse_rank": 2,
+      "group_safe_mae_rank": 2
+    },
+    {
+      "model": "building_name_te",
+      "old_count": 3791,
+      "old_RMSE_RM": 120201.22007355573,
+      "old_MAE_RM": 61613.19807437313,
+      "old_Median_AE_RM": 32652.10208560177,
+      "old_R2": 0.8670776734261412,
+      "old_Adjusted_R2": 0.8655881489554629,
+      "old_Top5_count": 190,
+      "old_Top5_RMSE_RM": 418749.3874791527,
+      "old_Top5_MAE_RM": 294819.8269345541,
+      "old_P95_P99_count": 151,
+      "old_P95_P99_RMSE_RM": 321007.7322299182,
+      "old_P95_P99_MAE_RM": 241188.61422094668,
+      "old_P99_P100_count": 39,
+      "old_P99_P100_RMSE_RM": 674760.3339160001,
+      "old_P99_P100_MAE_RM": 502468.8812872389,
+      "group_safe_count": 3791,
+      "group_safe_RMSE_RM": 132741.8433922035,
+      "group_safe_MAE_RM": 67014.93047828709,
+      "group_safe_Median_AE_RM": 36805.72645207739,
+      "group_safe_R2": 0.8378952012737799,
+      "group_safe_Adjusted_R2": 0.836078658705343,
+      "group_safe_Top5_count": 190,
+      "group_safe_Top5_RMSE_RM": 464349.0249342438,
+      "group_safe_Top5_MAE_RM": 317499.44931975816,
+      "group_safe_P95_P99_count": 151,
+      "group_safe_P95_P99_RMSE_RM": 337733.85147457424,
+      "group_safe_P95_P99_MAE_RM": 248891.43213259394,
+      "group_safe_P99_P100_count": 39,
+      "group_safe_P99_P100_RMSE_RM": 780271.4173186452,
+      "group_safe_P99_P100_MAE_RM": 583135.6184290352,
+      "rmse_change_RM": 12540.623318647777,
+      "mae_change_RM": 5401.732403913957,
+      "group_safe_rmse_rank": 3,
+      "group_safe_mae_rank": 4
+    },
+    {
+      "model": "position_regex_lightgbm",
+      "old_count": 3791,
+      "old_RMSE_RM": 118750.19350875785,
+      "old_MAE_RM": 60967.10968555279,
+      "old_Median_AE_RM": 32559.579623052035,
+      "old_R2": 0.8702674858843791,
+      "old_Adjusted_R2": 0.8686384642003198,
+      "old_Top5_count": 190,
+      "old_Top5_RMSE_RM": 412319.68890075386,
+      "old_Top5_MAE_RM": 291219.0401045874,
+      "old_P95_P99_count": 151,
+      "old_P95_P99_RMSE_RM": 314958.7752133207,
+      "old_P95_P99_MAE_RM": 238293.4494681764,
+      "old_P99_P100_count": 39,
+      "old_P99_P100_RMSE_RM": 666455.9225201581,
+      "old_P99_P100_MAE_RM": 496136.0705173581,
+      "group_safe_count": 3791,
+      "group_safe_RMSE_RM": 131799.71256584063,
+      "group_safe_MAE_RM": 66703.74785193184,
+      "group_safe_Median_AE_RM": 35991.539170052856,
+      "group_safe_R2": 0.8401881022549351,
+      "group_safe_Adjusted_R2": 0.8381813805894214,
+      "group_safe_Top5_count": 190,
+      "group_safe_Top5_RMSE_RM": 457821.3232990301,
+      "group_safe_Top5_MAE_RM": 315276.99819459306,
+      "group_safe_P95_P99_count": 151,
+      "group_safe_P95_P99_RMSE_RM": 328757.63094666187,
+      "group_safe_P95_P99_MAE_RM": 242541.53276562208,
+      "group_safe_P99_P100_count": 39,
+      "group_safe_P99_P100_RMSE_RM": 776311.9682029,
+      "group_safe_P99_P100_MAE_RM": 596893.8002400963,
+      "rmse_change_RM": 13049.519057082784,
+      "mae_change_RM": 5736.638166379053,
+      "group_safe_rmse_rank": 1,
+      "group_safe_mae_rank": 1
+    }
+  ],
+  "ranking": {
+    "best_by_RMSE": "position_regex_lightgbm",
+    "best_by_MAE": "position_regex_lightgbm",
+    "position_best_by_both": true,
+    "position_direct_comparisons": {
+      "random_forest": {
+        "RMSE_difference_RM": -7693.847624196118,
+        "MAE_difference_RM": -306.0705561022187,
+        "RMSE_folds_won": 5,
+        "MAE_folds_won": 2
+      },
+      "lightgbm_interaction": {
+        "RMSE_difference_RM": -651.5758497426286,
+        "MAE_difference_RM": -125.40664687406388,
+        "RMSE_folds_won": 4,
+        "MAE_folds_won": 3
+      },
+      "building_name_te": {
+        "RMSE_difference_RM": -942.1308263628744,
+        "MAE_difference_RM": -311.18262635525025,
+        "RMSE_folds_won": 3,
+        "MAE_folds_won": 4
+      }
+    }
+  },
+  "bootstrap": {
+    "samples": 5000,
+    "seed": 42,
+    "comparisons": {
+      "random_forest": {
+        "bootstrap_draws": 5000,
+        "difference_definition": "Position-regex minus reference; negative is better",
+        "RMSE_difference_RM": -7693.847624196118,
+        "RMSE_bootstrap_mean_RM": -7624.384667783323,
+        "RMSE_CI95_lower_RM": -18128.13779110029,
+        "RMSE_CI95_upper_RM": 1027.1752509510868,
+        "MAE_difference_RM": -306.0705561022244,
+        "MAE_bootstrap_mean_RM": -291.4927882375384,
+        "MAE_CI95_lower_RM": -2147.7703103799895,
+        "MAE_CI95_upper_RM": 1432.7904935222118,
+        "RMSE_statistically_reliable": false,
+        "MAE_statistically_reliable": false,
+        "fixed_oof_limitation": "Paired row bootstrap does not include model refitting, grouped resampling, or selection uncertainty."
+      },
+      "lightgbm_interaction": {
+        "bootstrap_draws": 5000,
+        "difference_definition": "Position-regex minus reference; negative is better",
+        "RMSE_difference_RM": -651.5758497426286,
+        "RMSE_bootstrap_mean_RM": -639.6130429890584,
+        "RMSE_CI95_lower_RM": -2063.343914679982,
+        "RMSE_CI95_upper_RM": 786.2053563943726,
+        "MAE_difference_RM": -125.4066468740702,
+        "MAE_bootstrap_mean_RM": -122.28713154587535,
+        "MAE_CI95_lower_RM": -626.8243592727773,
+        "MAE_CI95_upper_RM": 394.2957402162618,
+        "RMSE_statistically_reliable": false,
+        "MAE_statistically_reliable": false,
+        "fixed_oof_limitation": "Paired row bootstrap does not include model refitting, grouped resampling, or selection uncertainty."
+      },
+      "building_name_te": {
+        "bootstrap_draws": 5000,
+        "difference_definition": "Position-regex minus reference; negative is better",
+        "RMSE_difference_RM": -942.1308263628744,
+        "RMSE_bootstrap_mean_RM": -916.6428522795755,
+        "RMSE_CI95_lower_RM": -3663.5460275012947,
+        "RMSE_CI95_upper_RM": 1582.0283569236176,
+        "MAE_difference_RM": -311.18262635524985,
+        "MAE_bootstrap_mean_RM": -304.5856842142689,
+        "MAE_CI95_lower_RM": -941.6029940233046,
+        "MAE_CI95_upper_RM": 349.2119170873752,
+        "RMSE_statistically_reliable": false,
+        "MAE_statistically_reliable": false,
+        "fixed_oof_limitation": "Paired row bootstrap does not include model refitting, grouped resampling, or selection uncertainty."
+      }
+    },
+    "position_advantage_reliable_on_both_metrics_vs_all_references": false
+  },
+  "invalid_row_fixed_fold_subtest": {
+    "invalid_listing_ids": [
+      102236931,
+      103207012,
+      103609830
+    ],
+    "independent_evidence": {
+      "103609830": {
+        "rule": "MULTI_UNIT_BUNDLE_NOT_SINGLE_OBSERVATION",
+        "distinct_sizes": 2,
+        "distinct_prices": 4
+      },
+      "102236931": {
+        "rule": "BEDROOM_COUNT_DESCRIPTION_CONTRADICTION",
+        "structured_bedroom": 10.0
+      },
+      "103207012": {
+        "rule": "BATHROOM_COUNT_CONFIGURATION_CONTRADICTION",
+        "structured_bathroom": 8.0
+      }
+    },
+    "retained_rows": 3788,
+    "original_fold_membership_preserved": true,
+    "original_retained_RMSE_RM": 117360.15496127021,
+    "original_retained_MAE_RM": 60611.27413439672,
+    "retrained_retained_RMSE_RM": 120411.89338644159,
+    "retrained_retained_MAE_RM": 61522.62783733013,
+    "RMSE_gain_original_minus_retrained_RM": -3051.738425171381,
+    "MAE_gain_original_minus_retrained_RM": -911.3537029334111,
+    "removal_improves_both": false,
+    "kept_separate_from_group_safe_cv": true
+  },
+  "answers": {
+    "repeat_listings_cause_optimistic_cv": true,
+    "repeat_leakage_interpretation": "Evidence is consistent with repeat leakage causing optimistic historical CV: repeat groups crossed folds, both overall errors worsened, and repeat-row RMSE/MAE increased much more than non-repeat-row errors. The exact overall delta is not purely causal because group-safe CV reallocates folds.",
+    "position_regex_remains_strongest": true
+  },
+  "leakage_controls": {
+    "preprocessing_outer_fold_local": true,
+    "building_te_outer_training_only": true,
+    "building_te_inner_oof": true,
+    "regex_target_free": true,
+    "validation_target_used_for_features_or_tuning": false,
+    "fit_audit": [
+      {
+        "model": "random_forest",
+        "fold": 1,
+        "training_rows": 3022,
+        "validation_rows": 769,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "model": "random_forest",
+        "fold": 2,
+        "training_rows": 3045,
+        "validation_rows": 746,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "model": "random_forest",
+        "fold": 3,
+        "training_rows": 3036,
+        "validation_rows": 755,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "model": "random_forest",
+        "fold": 4,
+        "training_rows": 3026,
+        "validation_rows": 765,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "model": "random_forest",
+        "fold": 5,
+        "training_rows": 3035,
+        "validation_rows": 756,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "model": "lightgbm_interaction",
+        "fold": 1,
+        "training_rows": 3022,
+        "validation_rows": 769,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "model": "lightgbm_interaction",
+        "fold": 2,
+        "training_rows": 3045,
+        "validation_rows": 746,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "model": "lightgbm_interaction",
+        "fold": 3,
+        "training_rows": 3036,
+        "validation_rows": 755,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "model": "lightgbm_interaction",
+        "fold": 4,
+        "training_rows": 3026,
+        "validation_rows": 765,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "model": "lightgbm_interaction",
+        "fold": 5,
+        "training_rows": 3035,
+        "validation_rows": 756,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "model": "building_name_te",
+        "fold": 1,
+        "training_rows": 3022,
+        "validation_rows": 769,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "model": "building_name_te",
+        "fold": 2,
+        "training_rows": 3045,
+        "validation_rows": 746,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "model": "building_name_te",
+        "fold": 3,
+        "training_rows": 3036,
+        "validation_rows": 755,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "model": "building_name_te",
+        "fold": 4,
+        "training_rows": 3026,
+        "validation_rows": 765,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "model": "building_name_te",
+        "fold": 5,
+        "training_rows": 3035,
+        "validation_rows": 756,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "model": "position_regex_lightgbm",
+        "fold": 1,
+        "training_rows": 3022,
+        "validation_rows": 769,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "model": "position_regex_lightgbm",
+        "fold": 2,
+        "training_rows": 3045,
+        "validation_rows": 746,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "model": "position_regex_lightgbm",
+        "fold": 3,
+        "training_rows": 3036,
+        "validation_rows": 755,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "model": "position_regex_lightgbm",
+        "fold": 4,
+        "training_rows": 3026,
+        "validation_rows": 765,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "model": "position_regex_lightgbm",
+        "fold": 5,
+        "training_rows": 3035,
+        "validation_rows": 756,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      }
+    ]
+  },
+  "reproducibility": {
+    "python": "3.14.0",
+    "pandas": "3.0.3",
+    "scikit_learn": "1.9.0",
+    "lightgbm": "4.7.0",
+    "random_seed": 42,
+    "bootstrap_samples": 5000
+  },
+  "production_safety": {
+    "protected_file_count": 233,
+    "before_manifest_sha256": "b6a523e15aa3fe92f0ee16779eaa81f34bf718679e32fd63f4132abbb9d30a66",
+    "after_manifest_sha256": "b6a523e15aa3fe92f0ee16779eaa81f34bf718679e32fd63f4132abbb9d30a66",
+    "all_protected_files_unchanged": true
+  },
+  "metric_thresholds": {
+    "p95": 905000.0,
+    "p99": 1700000.0
+  },
+  "artifacts": [
+    "experiments/repeat_listing_leakage/results.json",
+    "experiments/repeat_listing_leakage/repeat_groups.csv",
+    "experiments/repeat_listing_leakage/repeat_group_summary.csv",
+    "experiments/repeat_listing_leakage/group_safe_fold_assignments.csv",
+    "experiments/repeat_listing_leakage/model_comparison.csv",
+    "experiments/repeat_listing_leakage/fold_metrics.csv",
+    "experiments/repeat_listing_leakage/oof_predictions.csv",
+    "experiments/repeat_listing_leakage/invalid_row_fixed_fold_comparison.csv",
+    "experiments/repeat_listing_leakage/run_experiment.py",
+    "experiments/repeat_listing_leakage/test_invariants.py"
+  ],
+  "runtime_seconds": 55.315034400031436
+}

@@ -1,0 +1,177 @@
+{
+  "high_cardinality_columns": [
+    "building_name",
+    "developer",
+    "city"
+  ],
+  "categorical_cardinality": {
+    "property_type": {
+      "unique_count": 8,
+      "missing_count": 0
+    },
+    "tenure_type": {
+      "unique_count": 2,
+      "missing_count": 0
+    },
+    "land_title": {
+      "unique_count": 3,
+      "missing_count": 0
+    },
+    "floor_range": {
+      "unique_count": 4,
+      "missing_count": 0
+    },
+    "state": {
+      "unique_count": 16,
+      "missing_count": 0
+    },
+    "building_name": {
+      "unique_count": 1936,
+      "missing_count": 0
+    },
+    "developer": {
+      "unique_count": 579,
+      "missing_count": 0
+    },
+    "city": {
+      "unique_count": 149,
+      "missing_count": 0
+    }
+  },
+  "target_encoding_target": "price / property_size_sqft (PPSF)",
+  "smoothing_values_tested": [
+    5.0,
+    10.0,
+    20.0,
+    50.0,
+    100.0
+  ],
+  "smoothing_selection": "inside each outer training fold using inner-OOF PPSF proxy RMSE",
+  "baseline_numerical_features": [
+    "property_size_sqft",
+    "bedroom",
+    "bathroom",
+    "parking_lot",
+    "facilities_count",
+    "has_school",
+    "has_mall",
+    "has_hospital",
+    "has_railway",
+    "has_bus_stop",
+    "has_park",
+    "has_highway",
+    "completion_year",
+    "property_age",
+    "number_of_floors",
+    "total_units",
+    "description_length",
+    "has_swimming_pool",
+    "has_security",
+    "has_lift",
+    "has_gym",
+    "has_playground",
+    "is_furnished",
+    "is_renovated",
+    "log1p_property_size_sqft",
+    "property_size_sqft_squared"
+  ],
+  "baseline_categorical_features": [
+    "property_type",
+    "tenure_type",
+    "land_title",
+    "floor_range",
+    "state",
+    "building_name",
+    "developer",
+    "city",
+    "size_band",
+    "state_property_type",
+    "city_property_type",
+    "city_tenure_type",
+    "city_building_name",
+    "city_developer",
+    "city_size_band",
+    "property_type_size_band"
+  ],
+  "target_encoding_variants": {
+    "developer_te": {
+      "columns": [
+        "developer"
+      ],
+      "retain_raw": false,
+      "frequency": false
+    },
+    "building_name_te": {
+      "columns": [
+        "building_name"
+      ],
+      "retain_raw": false,
+      "frequency": false
+    },
+    "city_te": {
+      "columns": [
+        "city"
+      ],
+      "retain_raw": false,
+      "frequency": false
+    },
+    "developer_building_te": {
+      "columns": [
+        "developer",
+        "building_name"
+      ],
+      "retain_raw": false,
+      "frequency": false
+    },
+    "all_te_replace": {
+      "columns": [
+        "developer",
+        "building_name",
+        "city"
+      ],
+      "retain_raw": false,
+      "frequency": false
+    },
+    "all_te_plus_raw": {
+      "columns": [
+        "developer",
+        "building_name",
+        "city"
+      ],
+      "retain_raw": true,
+      "frequency": false
+    },
+    "all_te_plus_frequency": {
+      "columns": [
+        "developer",
+        "building_name",
+        "city"
+      ],
+      "retain_raw": false,
+      "frequency": true
+    }
+  },
+  "spatial_geometry_feature_names": [
+    "nearest_property_distance_km",
+    "knn_3_mean_distance_km",
+    "knn_5_mean_distance_km",
+    "knn_10_mean_distance_km",
+    "knn_20_mean_distance_km",
+    "knn_5_max_distance_km",
+    "knn_10_max_distance_km",
+    "properties_within_1km",
+    "properties_within_3km",
+    "properties_within_5km",
+    "properties_within_10km"
+  ],
+  "spatial_ppsf_feature_names": [
+    "knn_5_median_ppsf",
+    "knn_10_median_ppsf",
+    "knn_20_median_ppsf",
+    "knn_5_mean_ppsf",
+    "knn_10_mean_ppsf",
+    "knn_10_weighted_ppsf"
+  ],
+  "spatial_status": "not_run_missing_coordinates",
+  "poi_status": "not_run_no_verified_poi_coordinates"
+}

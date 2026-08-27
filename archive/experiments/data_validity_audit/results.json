@@ -1,0 +1,514 @@
+{
+  "question": "Can defensibly invalid/corrupted rows be removed without deleting legitimate difficult properties, and does retraining improve matched-row performance?",
+  "audit_scope": {
+    "dataset": "data/processed/enhanced_city_dataset.csv",
+    "canonical_rows": 3791,
+    "grain": "one unique canonical listing_id",
+    "dataset_sha256": "4a295007fc5fdf6def33a612797606dfb60d811e7b19ade930466033a1fd66cf",
+    "raw_description_sha256": "82e4b2483fbd7919b4572cbefa7658fcd9d193fef3a5a1d835a9496b07017e77",
+    "reference_oof_sha256": "4b6a776465b57a950242a7fa85b94d36753e4f982a462faad0f75c283cb1df5a",
+    "description_linkage": {
+      "linkage_method": "replay canonical cleaning pipeline, then exact Ad List == listing_id order assertion",
+      "fuzzy_join_used": false,
+      "raw_rows": 4000,
+      "cleaned_raw_rows": 3791,
+      "canonical_rows": 3791,
+      "linked_rows": 3791,
+      "unique_canonical_ids": 3791,
+      "unique_cleaned_raw_ids": 3791,
+      "missing_description_count": 0,
+      "many_to_many_join": false,
+      "exact_order_match": true,
+      "rows_reintroduced": 0
+    },
+    "rules_optimized_for_model_metrics": false,
+    "price_percentile_used_as_deletion_rule": false,
+    "ppsf_used_as_deletion_rule": false,
+    "optional_missingness_used_as_deletion_rule": false
+  },
+  "validity_rules": {
+    "EXACT_DUPLICATE_CANONICAL_ROW": {
+      "classification": "CLEARLY_INVALID",
+      "criterion": "A later row is byte-for-value identical across every canonical column, including listing_id.",
+      "rationale": "It is the same canonical observation repeated; keeping one preserves information without double counting.",
+      "deletion_rule": true
+    },
+    "CRITICAL_INVALID_PRICE": {
+      "classification": "CLEARLY_INVALID",
+      "criterion": "price is missing, non-finite, or <= 0",
+      "rationale": "A positive finite target is required for supervised PPSF modelling.",
+      "deletion_rule": true
+    },
+    "CRITICAL_INVALID_PROPERTY_SIZE": {
+      "classification": "CLEARLY_INVALID",
+      "criterion": "property_size_sqft is missing, non-finite, or <= 0",
+      "rationale": "A positive finite denominator is required to define PPSF.",
+      "deletion_rule": true
+    },
+    "IMPOSSIBLE_CORE_COUNT": {
+      "classification": "CLEARLY_INVALID",
+      "criterion": "bedroom, bathroom, or parking is non-integer, negative, or above the repository's broad hard ceiling of 20",
+      "rationale": "These are discrete property counts; values outside the broad source-validity domain indicate parsing or entry corruption.",
+      "deletion_rule": true
+    },
+    "OUTSIDE_BROAD_SIZE_DOMAIN": {
+      "classification": "CLEARLY_INVALID",
+      "criterion": "property_size_sqft is outside the repository's established 100-20,000 sq-ft hard validity domain",
+      "rationale": "The existing source cleaner defines this broad range as the parse-valid domain; it is not a percentile rule.",
+      "deletion_rule": true
+    },
+    "MULTI_UNIT_BUNDLE_NOT_SINGLE_OBSERVATION": {
+      "classification": "CLEARLY_INVALID",
+      "criterion": "description explicitly sells two units together and lists multiple unit sizes and component prices",
+      "rationale": "One row cannot map a bundle price to one property size, so its target and PPSF are not a single-property observation.",
+      "deletion_rule": true
+    },
+    "BEDROOM_COUNT_DESCRIPTION_CONTRADICTION": {
+      "classification": "CLEARLY_INVALID",
+      "criterion": "structured bedroom >= 8 but the description explicitly identifies three bedrooms and does not identify eight bedrooms",
+      "rationale": "The structured core count conflicts with direct listing evidence; the raw description instead itemizes non-bedroom rooms.",
+      "deletion_rule": true
+    },
+    "BATHROOM_COUNT_CONFIGURATION_CONTRADICTION": {
+      "classification": "CLEARLY_INVALID",
+      "criterion": "bathroom >= 6 in <600 sq ft, exceeds bedroom by >3, and description advertises two-bathroom configurations rather than the encoded count",
+      "rationale": "The structured count is physically implausible for the stated size and contradicted by the listing's configurations.",
+      "deletion_rule": true
+    },
+    "POSSIBLE_REPEAT_DIFFERENT_LISTING_ID": {
+      "classification": "SUSPICIOUS",
+      "criterion": "different listing_ids have identical canonical fields excluding listing_id",
+      "rationale": "May be a relisted ad or may be distinct units sharing attributes; it must not be auto-deleted.",
+      "deletion_rule": false
+    },
+    "ISOLATED_FLOOR_COUNT_NEEDS_REVIEW": {
+      "classification": "SUSPICIOUS",
+      "criterion": "number_of_floors >= 80 (the dataset has one isolated value at 135; the next-highest observed value is 63)",
+      "rationale": "The value is not impossible globally, but it is unsupported and isolated enough to require source verification.",
+      "deletion_rule": false
+    },
+    "STRATA_TOTAL_UNITS_NEEDS_REVIEW": {
+      "classification": "SUSPICIOUS",
+      "criterion": "a flat/apartment/condominium/service residence reports <=3 or >=5,000 total units",
+      "rationale": "This may refer to a block, phase, or parsing artifact rather than the development; the optional field can be imputed, so retain the row.",
+      "deletion_rule": false
+    },
+    "UNSUPPORTED_HIGH_PARKING_COUNT": {
+      "classification": "SUSPICIOUS",
+      "criterion": "parking_lot >=5 without the same count explicitly supported in the description",
+      "rationale": "Large parking allocations exist, but unsupported counts in small/ordinary units need source review and are not deletion grounds.",
+      "deletion_rule": false
+    },
+    "SINGLE_DESCRIPTION_SIZE_MISMATCH": {
+      "classification": "SUSPICIOUS",
+      "criterion": "description contains one plausible explicit sq-ft value differing by >10% from the structured size",
+      "rationale": "May reflect garden/balcony area, a stale template, or a parse error; retain pending verification.",
+      "deletion_rule": false
+    },
+    "OPTIONAL_COMPLETION_YEAR_NEEDS_REVIEW": {
+      "classification": "SUSPICIOUS",
+      "criterion": "non-missing completion_year is non-integer or outside the repository's broad 1900-2030 source-validity domain",
+      "rationale": "The optional year should be verified or set missing; it does not make the target/size observation unusable.",
+      "deletion_rule": false
+    },
+    "OPTIONAL_FLOOR_OR_UNIT_DOMAIN_NEEDS_REVIEW": {
+      "classification": "SUSPICIOUS",
+      "criterion": "non-missing floors is non-integer/outside 1-200, or total_units is non-integer/outside 1-20,000",
+      "rationale": "These optional development attributes should be verified or imputed rather than causing automatic row deletion.",
+      "deletion_rule": false
+    }
+  },
+  "audit_results": {
+    "exact_duplicate_rows": 0,
+    "exact_duplicate_rows_removed": 0,
+    "possible_repeat_rows": 45,
+    "possible_repeat_groups": 22,
+    "possible_repeat_identical_description_rows": 43,
+    "critical_invalid_price_rows": 0,
+    "critical_invalid_size_rows": 0,
+    "ppsf_lower_diagnostic_threshold": 111.78227194492256,
+    "ppsf_upper_diagnostic_threshold": 1241.6689152725326,
+    "ppsf_extreme_rows": 38,
+    "valid_but_extreme_rows": 75,
+    "premium_over_850k_rows": 220,
+    "top5_threshold_rm": 905000.0,
+    "top5_rows": 190,
+    "top1_threshold_rm": 1700000.0,
+    "top1_rows": 39,
+    "status_counts": {
+      "VALID": 3671,
+      "SUSPICIOUS": 117,
+      "CLEARLY_INVALID": 3
+    },
+    "rule_counts": {
+      "EXACT_DUPLICATE_CANONICAL_ROW": 0,
+      "CRITICAL_INVALID_PRICE": 0,
+      "CRITICAL_INVALID_PROPERTY_SIZE": 0,
+      "IMPOSSIBLE_CORE_COUNT": 0,
+      "OUTSIDE_BROAD_SIZE_DOMAIN": 0,
+      "MULTI_UNIT_BUNDLE_NOT_SINGLE_OBSERVATION": 1,
+      "BEDROOM_COUNT_DESCRIPTION_CONTRADICTION": 1,
+      "BATHROOM_COUNT_CONFIGURATION_CONTRADICTION": 1,
+      "POSSIBLE_REPEAT_DIFFERENT_LISTING_ID": 45,
+      "ISOLATED_FLOOR_COUNT_NEEDS_REVIEW": 1,
+      "STRATA_TOTAL_UNITS_NEEDS_REVIEW": 20,
+      "UNSUPPORTED_HIGH_PARKING_COUNT": 7,
+      "SINGLE_DESCRIPTION_SIZE_MISMATCH": 44,
+      "OPTIONAL_COMPLETION_YEAR_NEEDS_REVIEW": 0,
+      "OPTIONAL_FLOOR_OR_UNIT_DOMAIN_NEEDS_REVIEW": 0
+    },
+    "physical_profile": {
+      "bedroom": {
+        "missing": 0,
+        "minimum": 1.0,
+        "maximum": 10.0,
+        "non_integer": 0
+      },
+      "bathroom": {
+        "missing": 0,
+        "minimum": 1.0,
+        "maximum": 8.0,
+        "non_integer": 0
+      },
+      "parking_lot": {
+        "missing": 0,
+        "minimum": 1.0,
+        "maximum": 10.0,
+        "non_integer": 0
+      },
+      "property_size_sqft": {
+        "missing": 0,
+        "minimum": 280.0,
+        "maximum": 9800.0,
+        "non_integer": 1
+      },
+      "completion_year": {
+        "missing": 1905,
+        "minimum": 1985.0,
+        "maximum": 2026.0,
+        "non_integer": 0
+      },
+      "number_of_floors": {
+        "missing": 1657,
+        "minimum": 2.0,
+        "maximum": 135.0,
+        "non_integer": 0
+      },
+      "total_units": {
+        "missing": 1797,
+        "minimum": 1.0,
+        "maximum": 7810.0,
+        "non_integer": 0
+      }
+    }
+  },
+  "classification_counts": {
+    "VALID": 3671,
+    "SUSPICIOUS": 117,
+    "CLEARLY_INVALID": 3
+  },
+  "exact_duplicates": {
+    "rows_found": 0,
+    "rows_removed_after_first": 0
+  },
+  "possible_repeats": {
+    "rows": 45,
+    "groups": 22,
+    "identical_description_rows": 43,
+    "automatic_deletion": false,
+    "group_members": {
+      "PR001": [
+        103538513,
+        103407021
+      ],
+      "PR002": [
+        103450483,
+        94044194
+      ],
+      "PR003": [
+        101960423,
+        102904007
+      ],
+      "PR004": [
+        102138231,
+        103464263
+      ],
+      "PR005": [
+        101856001,
+        103204105
+      ],
+      "PR006": [
+        102315606,
+        102498879
+      ],
+      "PR007": [
+        103804090,
+        103796162
+      ],
+      "PR008": [
+        102229930,
+        102999145
+      ],
+      "PR009": [
+        103795360,
+        103795288
+      ],
+      "PR010": [
+        103492971,
+        103492972
+      ],
+      "PR011": [
+        103726720,
+        103446974
+      ],
+      "PR012": [
+        103151143,
+        103150184
+      ],
+      "PR013": [
+        103336579,
+        103470201
+      ],
+      "PR014": [
+        92021859,
+        101898183
+      ],
+      "PR015": [
+        103446635,
+        103470394
+      ],
+      "PR016": [
+        103792002,
+        103791160
+      ],
+      "PR017": [
+        102920898,
+        103178916
+      ],
+      "PR018": [
+        103784759,
+        103784715
+      ],
+      "PR019": [
+        103245262,
+        103245254
+      ],
+      "PR020": [
+        103758671,
+        103758407,
+        103758389
+      ],
+      "PR021": [
+        103780877,
+        103780151
+      ],
+      "PR022": [
+        103470205,
+        103223072
+      ]
+    }
+  },
+  "cleaned_experimental_variant": {
+    "original_rows": 3791,
+    "clearly_invalid_rows": 3,
+    "rows_retained": 3788,
+    "retention_pct": 99.92086520706937,
+    "removal_reasons": [
+      "BATHROOM_COUNT_CONFIGURATION_CONTRADICTION",
+      "BEDROOM_COUNT_DESCRIPTION_CONTRADICTION",
+      "MULTI_UNIT_BUNDLE_NOT_SINGLE_OBSERVATION"
+    ],
+    "premium_over_850k_removed": 1,
+    "top5_removed": 1,
+    "top1_removed": 1,
+    "replacement_dataset_created": false
+  },
+  "model": {
+    "configuration": "exact existing Position-regex LightGBM PPSF model",
+    "position_regex_features": [
+      "is_high_floor_text",
+      "is_low_floor_text",
+      "is_top_floor_text",
+      "has_balcony",
+      "has_large_balcony"
+    ],
+    "predictor_count": 47,
+    "cv": {
+      "class": "KFold",
+      "n_splits": 5,
+      "shuffle": true,
+      "random_state": 42
+    },
+    "hyperparameters_retuned": false,
+    "canonical": {
+      "count": 3791,
+      "rmse_rm": 118750.19350875785,
+      "mae_rm": 60967.10968555279,
+      "r2": 0.8702674858843791,
+      "adjusted_r2": 0.8686384642003198,
+      "median_ae_rm": 32559.579623052035,
+      "top5": {
+        "count": 190,
+        "rmse_rm": 412319.68890075386,
+        "mae_rm": 291219.0401045874
+      },
+      "p95_p99": {
+        "count": 151,
+        "rmse_rm": 314958.7752133207,
+        "mae_rm": 238293.4494681764
+      },
+      "p99_p100": {
+        "count": 39,
+        "rmse_rm": 666455.9225201581,
+        "mae_rm": 496136.0705173581
+      }
+    },
+    "cleaned_retrained": {
+      "count": 3788,
+      "rmse_rm": 121865.0352022166,
+      "mae_rm": 61453.47706947923,
+      "r2": 0.8602071107159615,
+      "adjusted_r2": 0.8584503551554401,
+      "median_ae_rm": 33589.17414459486,
+      "top5": {
+        "count": 189,
+        "rmse_rm": 434220.46807343623,
+        "mae_rm": 294840.5433246634
+      },
+      "p95_p99": {
+        "count": 151,
+        "rmse_rm": 298673.83229111094,
+        "mae_rm": 218985.1516316035
+      },
+      "p99_p100": {
+        "count": 38,
+        "rmse_rm": 763739.8744704885,
+        "mae_rm": 596265.9155786646
+      }
+    },
+    "original_on_retained_rows": {
+      "count": 3788,
+      "rmse_rm": 117360.15496127021,
+      "mae_rm": 60611.27413439672,
+      "r2": 0.8703512920310117,
+      "adjusted_r2": 0.8687220168239148,
+      "median_ae_rm": 32548.635945681483,
+      "top5": {
+        "count": 189,
+        "rmse_rm": 406801.3129847609,
+        "mae_rm": 287404.9015438276
+      },
+      "p95_p99": {
+        "count": 151,
+        "rmse_rm": 314958.7752133207,
+        "mae_rm": 238293.4494681764
+      },
+      "p99_p100": {
+        "count": 38,
+        "rmse_rm": 654901.5136052413,
+        "mae_rm": 482558.30321286287
+      }
+    },
+    "retraining_gain": {
+      "definition": "matched original minus retrained; positive is better",
+      "rmse_gain_rm": -4504.880240946397,
+      "mae_gain_rm": -842.2029350825105,
+      "improved_both": false
+    },
+    "reference_metrics_reproduced": true,
+    "reference_checks": {
+      "rmse_rm": true,
+      "mae_rm": true,
+      "r2": true,
+      "top5_rmse_rm": true
+    }
+  },
+  "removed_row_diagnostics": {
+    "count": 3,
+    "rmse_rm": 654608.2395129118,
+    "mae_rm": 510268.7989452752,
+    "rows": [
+      {
+        "row_id": 103609830,
+        "price": 788000,
+        "property_size_sqft": 318.0,
+        "ppsf": 2477.987421383648,
+        "original_oof_prediction_rm": 276973.5115109694,
+        "original_oof_absolute_error_rm": 511026.4884890306,
+        "flag_reason": "MULTI_UNIT_BUNDLE_NOT_SINGLE_OBSERVATION",
+        "audit_evidence": "Description supplies two unit sizes and component prices while the row contains one size and one bundle price. | PPSF_DIAGNOSTIC_ONLY=2477.99; classified from independent evidence, never PPSF alone. | OPTIONAL_MISSING_COUNT=5; retained with existing fold-safe handling unless another independent rule applies."
+      },
+      {
+        "row_id": 102236931,
+        "price": 3499999,
+        "property_size_sqft": 4500.0,
+        "ppsf": 777.7775555555555,
+        "original_oof_prediction_rm": 2487907.771911824,
+        "original_oof_absolute_error_rm": 1012091.2280881759,
+        "flag_reason": "BEDROOM_COUNT_DESCRIPTION_CONTRADICTION",
+        "audit_evidence": "Structured count is >=8; description explicitly says three bedrooms and itemizes other room types. | PREMIUM_REVIEW: price>RM850k; top5=True; top1=True; size=4500; ppsf=777.78; premium_text_features=2; known_location_or_building=True."
+      },
+      {
+        "row_id": 103207012,
+        "price": 210000,
+        "property_size_sqft": 463.0,
+        "ppsf": 453.56371490280776,
+        "original_oof_prediction_rm": 217688.68025861916,
+        "original_oof_absolute_error_rm": 7688.6802586191625,
+        "flag_reason": "BATHROOM_COUNT_CONFIGURATION_CONTRADICTION",
+        "audit_evidence": "Encoded bathrooms greatly exceed bedrooms in <600 sq ft; description offers two-bathroom layouts, not the encoded count. | OPTIONAL_MISSING_COUNT=5; retained with existing fold-safe handling unless another independent rule applies."
+      }
+    ]
+  },
+  "bootstrap": {
+    "eligibility_rule": "run only if retraining improves both matched-row RMSE and MAE",
+    "eligible": false,
+    "result": null
+  },
+  "premium_safety": {
+    "over_850k_rows_reviewed": 220,
+    "top5_rows_reviewed": 190,
+    "top1_rows_reviewed": 39,
+    "over_850k_removed": 1,
+    "top5_removed": 1,
+    "top1_removed": 1,
+    "removal_never_based_only_on_price_ppsf_or_premium_membership": true
+  },
+  "production_safety": {
+    "protected_file_count": 264,
+    "all_protected_files_unchanged": true,
+    "changed_protected_files": [],
+    "before_manifest_sha256": "1f23d0f40fbc8d969cf601a591efcead164a9a543054c2c9ee15f33253280cd1",
+    "after_manifest_sha256": "1f23d0f40fbc8d969cf601a591efcead164a9a543054c2c9ee15f33253280cd1"
+  },
+  "internal_tests": {
+    "canonical_grain": true,
+    "required_audit_columns_present": true,
+    "allowed_statuses_only": true,
+    "no_price_only_removal": true,
+    "no_ppsf_removal_rule": true,
+    "no_optional_missing_removal_rule": true,
+    "every_removed_row_has_reason": true,
+    "oof_complete_unique": true,
+    "reference_metrics_reproduced": true,
+    "protected_files_unchanged": true,
+    "all_passed": true
+  },
+  "decision": {
+    "genuinely_invalid_rows_found": 3,
+    "removal_genuinely_improved_both_metrics": false,
+    "recommendation": "Remove only the documented corrupt observations from future canonical rebuilds after source-owner review; retain suspicious, premium, PPSF-extreme, repeated-looking, and incomplete listings."
+  },
+  "runtime_seconds": 10.03270599996904,
+  "artifacts": [
+    "experiments/data_validity_audit/results.json",
+    "experiments/data_validity_audit/validity_audit.csv",
+    "experiments/data_validity_audit/clearly_invalid_rows.csv",
+    "experiments/data_validity_audit/suspicious_rows.csv",
+    "experiments/data_validity_audit/model_comparison.csv",
+    "experiments/data_validity_audit/fold_metrics.csv",
+    "experiments/data_validity_audit/oof_predictions.csv",
+    "experiments/data_validity_audit/run_experiment.py",
+    "experiments/data_validity_audit/test_invariants.py"
+  ]
+}

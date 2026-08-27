@@ -1,0 +1,1154 @@
+{
+  "question": "Does Position-regex LightGBM remain strongest as repeat-listing protection varies from minimal to conservative?",
+  "dataset": {
+    "path": "data/processed/enhanced_city_dataset.csv",
+    "rows": 3791,
+    "unique_listing_ids": 3791,
+    "sha256": "4a295007fc5fdf6def33a612797606dfb60d811e7b19ade930466033a1fd66cf",
+    "rows_deleted_as_repeats": 0
+  },
+  "description_linkage": {
+    "linkage_method": "replay canonical cleaning pipeline, then exact Ad List == listing_id order assertion",
+    "fuzzy_join_used": false,
+    "raw_rows": 4000,
+    "cleaned_raw_rows": 3791,
+    "canonical_rows": 3791,
+    "linked_rows": 3791,
+    "unique_canonical_ids": 3791,
+    "unique_cleaned_raw_ids": 3791,
+    "missing_description_count": 0,
+    "many_to_many_join": false,
+    "exact_order_match": true,
+    "rows_reintroduced": 0
+  },
+  "grouping": {
+    "source": "experiments/repeat_listing_leakage/run_experiment.py",
+    "definitions_reused_without_change": true,
+    "counts_are_inclusive": true,
+    "level_counts": {
+      "level_1": {
+        "groups": 22,
+        "rows": 45,
+        "definition_is_inclusive": true
+      },
+      "level_2": {
+        "groups": 27,
+        "rows": 57,
+        "definition_is_inclusive": true
+      },
+      "level_3": {
+        "groups": 234,
+        "rows": 500,
+        "definition_is_inclusive": true
+      }
+    },
+    "scenarios": {
+      "A": {
+        "name": "Scenario A - Level 1 only",
+        "interpretation": "minimal duplicate protection",
+        "levels": [
+          1
+        ],
+        "repeat_group_count": 22,
+        "repeat_rows_grouped": 45,
+        "repeat_percentage": 1.1870218939593775,
+        "fold_sizes": {
+          "1": 758,
+          "2": 755,
+          "3": 760,
+          "4": 758,
+          "5": 760
+        },
+        "repeat_groups_crossing_folds": 0,
+        "all_models_use_identical_folds": true
+      },
+      "B": {
+        "name": "Scenario B - Level 1 + Level 2",
+        "interpretation": "moderate / strong-repeat protection",
+        "levels": [
+          1,
+          2
+        ],
+        "repeat_group_count": 28,
+        "repeat_rows_grouped": 59,
+        "repeat_percentage": 1.5563175943022949,
+        "fold_sizes": {
+          "1": 757,
+          "2": 755,
+          "3": 759,
+          "4": 762,
+          "5": 758
+        },
+        "repeat_groups_crossing_folds": 0,
+        "all_models_use_identical_folds": true
+      },
+      "C": {
+        "name": "Scenario C - Level 1 + Level 2 + Level 3",
+        "interpretation": "conservative protection including possible repeats",
+        "levels": [
+          1,
+          2,
+          3
+        ],
+        "repeat_group_count": 234,
+        "repeat_rows_grouped": 500,
+        "repeat_percentage": 13.189132155104193,
+        "fold_sizes": {
+          "1": 769,
+          "2": 746,
+          "3": 755,
+          "4": 765,
+          "5": 756
+        },
+        "repeat_groups_crossing_folds": 0,
+        "all_models_use_identical_folds": true
+      }
+    }
+  },
+  "models": {
+    "configurations_reused_without_retuning": true,
+    "specifications": {
+      "random_forest": {
+        "historical_variant": "random_forest_reference",
+        "predictors": 32
+      },
+      "lightgbm_interaction": {
+        "historical_variant": "lightgbm_structured_reference",
+        "predictors": 42
+      },
+      "building_name_te": {
+        "historical_variant": "building_name_te_reference",
+        "predictors": 42
+      },
+      "position_regex_lightgbm": {
+        "historical_variant": "regex_group_position",
+        "predictors": 47
+      }
+    },
+    "metrics": {
+      "A": {
+        "random_forest": {
+          "count": 3791,
+          "RMSE_RM": 126037.41630339062,
+          "MAE_RM": 61591.39375864719,
+          "Median_AE_RM": 33459.77719110111,
+          "R2": 0.8538566137468662,
+          "Adjusted_R2": 0.8526121783130981,
+          "Top5_count": 190,
+          "Top5_RMSE_RM": 447159.2784807401,
+          "Top5_MAE_RM": 292645.5340946842,
+          "P95_P99_count": 151,
+          "P95_P99_RMSE_RM": 310387.31115296186,
+          "P95_P99_MAE_RM": 217729.88743244493,
+          "P99_P100_count": 39,
+          "P99_P100_RMSE_RM": 775314.4464043729,
+          "P99_P100_MAE_RM": 582703.5506587388
+        },
+        "lightgbm_interaction": {
+          "count": 3791,
+          "RMSE_RM": 123410.3780721812,
+          "MAE_RM": 63205.79836251199,
+          "Median_AE_RM": 34067.493925158284,
+          "R2": 0.859885349433249,
+          "Adjusted_R2": 0.8583152279487763,
+          "Top5_count": 190,
+          "Top5_RMSE_RM": 430346.7679291021,
+          "Top5_MAE_RM": 298668.23621692666,
+          "P95_P99_count": 151,
+          "P95_P99_RMSE_RM": 337849.1149029051,
+          "P95_P99_MAE_RM": 247382.85962639272,
+          "P99_P100_count": 39,
+          "P99_P100_RMSE_RM": 678464.3111032692,
+          "P99_P100_MAE_RM": 497234.69429822493
+        },
+        "building_name_te": {
+          "count": 3791,
+          "RMSE_RM": 124222.18728727462,
+          "MAE_RM": 63223.08897445429,
+          "Median_AE_RM": 34475.08556909289,
+          "R2": 0.8580359023230029,
+          "Adjusted_R2": 0.8564450559776363,
+          "Top5_count": 190,
+          "Top5_RMSE_RM": 436361.0759846369,
+          "Top5_MAE_RM": 304753.0546149822,
+          "P95_P99_count": 151,
+          "P95_P99_RMSE_RM": 344389.995765404,
+          "P95_P99_MAE_RM": 251161.828319945,
+          "P99_P100_count": 39,
+          "P99_P100_RMSE_RM": 684420.2673847176,
+          "P99_P100_MAE_RM": 512247.289757306
+        },
+        "position_regex_lightgbm": {
+          "count": 3791,
+          "RMSE_RM": 122822.64306366096,
+          "MAE_RM": 63280.41233336591,
+          "Median_AE_RM": 34479.6392771111,
+          "R2": 0.8612167478507705,
+          "Adjusted_R2": 0.8594740781069784,
+          "Top5_count": 190,
+          "Top5_RMSE_RM": 425837.77745653247,
+          "Top5_MAE_RM": 298407.1367570416,
+          "P95_P99_count": 151,
+          "P95_P99_RMSE_RM": 330844.05243340955,
+          "P95_P99_MAE_RM": 244584.6325397551,
+          "P99_P100_count": 39,
+          "P99_P100_RMSE_RM": 677969.4148822987,
+          "P99_P100_MAE_RM": 506796.8325726892
+        }
+      },
+      "B": {
+        "random_forest": {
+          "count": 3791,
+          "RMSE_RM": 125115.274556188,
+          "MAE_RM": 61434.97328188159,
+          "Median_AE_RM": 32940.87114339473,
+          "R2": 0.8559872813471051,
+          "Adjusted_R2": 0.8547609889051433,
+          "Top5_count": 190,
+          "Top5_RMSE_RM": 443878.22807090264,
+          "Top5_MAE_RM": 289233.92996826407,
+          "P95_P99_count": 151,
+          "P95_P99_RMSE_RM": 298886.35108625144,
+          "P95_P99_MAE_RM": 209204.29241097128,
+          "P99_P100_count": 39,
+          "P99_P100_RMSE_RM": 783581.6318445975,
+          "P99_P100_MAE_RM": 599092.2702541923
+        },
+        "lightgbm_interaction": {
+          "count": 3791,
+          "RMSE_RM": 123687.30753439068,
+          "MAE_RM": 62101.24305633339,
+          "Median_AE_RM": 33153.335385987535,
+          "R2": 0.859255817126471,
+          "Adjusted_R2": 0.8576786411177495,
+          "Top5_count": 190,
+          "Top5_RMSE_RM": 432852.9804581155,
+          "Top5_MAE_RM": 291559.48511459224,
+          "P95_P99_count": 151,
+          "P95_P99_RMSE_RM": 317641.38316704734,
+          "P95_P99_MAE_RM": 233286.5519438716,
+          "P99_P100_count": 39,
+          "P99_P100_RMSE_RM": 722591.848798272,
+          "P99_P100_MAE_RM": 517180.3289294335
+        },
+        "building_name_te": {
+          "count": 3791,
+          "RMSE_RM": 122449.57178005652,
+          "MAE_RM": 62164.93420909483,
+          "Median_AE_RM": 33967.33120704186,
+          "R2": 0.8620585700162688,
+          "Adjusted_R2": 0.860512801590624,
+          "Top5_count": 190,
+          "Top5_RMSE_RM": 427241.71340769815,
+          "Top5_MAE_RM": 295896.103564469,
+          "P95_P99_count": 151,
+          "P95_P99_RMSE_RM": 316490.9660481171,
+          "P95_P99_MAE_RM": 238872.94756703006,
+          "P99_P100_count": 39,
+          "P99_P100_RMSE_RM": 708132.1629552046,
+          "P99_P100_MAE_RM": 516678.06652891234
+        },
+        "position_regex_lightgbm": {
+          "count": 3791,
+          "RMSE_RM": 122730.61964179797,
+          "MAE_RM": 61914.61545985387,
+          "Median_AE_RM": 33747.41704834136,
+          "R2": 0.8614246333849803,
+          "Adjusted_R2": 0.8596845740125769,
+          "Top5_count": 190,
+          "Top5_RMSE_RM": 429553.42393954756,
+          "Top5_MAE_RM": 292878.4111209925,
+          "P95_P99_count": 151,
+          "P95_P99_RMSE_RM": 317886.6026541521,
+          "P95_P99_MAE_RM": 234834.12475469374,
+          "P99_P100_count": 39,
+          "P99_P100_RMSE_RM": 712511.4780768498,
+          "P99_P100_MAE_RM": 517613.9814110211
+        }
+      },
+      "C": {
+        "random_forest": {
+          "count": 3791,
+          "RMSE_RM": 139493.56019003675,
+          "MAE_RM": 67009.81840803406,
+          "Median_AE_RM": 35709.791239027516,
+          "R2": 0.8209853805445035,
+          "Adjusted_R2": 0.8194610410494062,
+          "Top5_count": 190,
+          "Top5_RMSE_RM": 508683.37063856877,
+          "Top5_MAE_RM": 335608.73277740524,
+          "P95_P99_count": 151,
+          "P95_P99_RMSE_RM": 345178.12668925605,
+          "P95_P99_MAE_RM": 241600.60550394337,
+          "P99_P100_count": 39,
+          "P99_P100_RMSE_RM": 894037.6259269477,
+          "P99_P100_MAE_RM": 699588.9178618344
+        },
+        "lightgbm_interaction": {
+          "count": 3791,
+          "RMSE_RM": 132451.28841558326,
+          "MAE_RM": 66829.1544988059,
+          "Median_AE_RM": 35978.41040637143,
+          "R2": 0.8386040780900653,
+          "Adjusted_R2": 0.8367954791785879,
+          "Top5_count": 190,
+          "Top5_RMSE_RM": 461306.31867965683,
+          "Top5_MAE_RM": 316356.37038695277,
+          "P95_P99_count": 151,
+          "P95_P99_RMSE_RM": 333522.28407309554,
+          "P95_P99_MAE_RM": 245199.1212800608,
+          "P99_P100_count": 39,
+          "P99_P100_RMSE_RM": 778490.7246165184,
+          "P99_P100_MAE_RM": 591862.6425700473
+        },
+        "building_name_te": {
+          "count": 3791,
+          "RMSE_RM": 132741.8433922035,
+          "MAE_RM": 67014.93047828709,
+          "Median_AE_RM": 36805.72645207739,
+          "R2": 0.8378952012737799,
+          "Adjusted_R2": 0.836078658705343,
+          "Top5_count": 190,
+          "Top5_RMSE_RM": 464349.0249342438,
+          "Top5_MAE_RM": 317499.44931975816,
+          "P95_P99_count": 151,
+          "P95_P99_RMSE_RM": 337733.85147457424,
+          "P95_P99_MAE_RM": 248891.43213259394,
+          "P99_P100_count": 39,
+          "P99_P100_RMSE_RM": 780271.4173186452,
+          "P99_P100_MAE_RM": 583135.6184290352
+        },
+        "position_regex_lightgbm": {
+          "count": 3791,
+          "RMSE_RM": 131799.71256584063,
+          "MAE_RM": 66703.74785193184,
+          "Median_AE_RM": 35991.539170052856,
+          "R2": 0.8401881022549351,
+          "Adjusted_R2": 0.8381813805894214,
+          "Top5_count": 190,
+          "Top5_RMSE_RM": 457821.3232990301,
+          "Top5_MAE_RM": 315276.99819459306,
+          "P95_P99_count": 151,
+          "P95_P99_RMSE_RM": 328757.63094666187,
+          "P95_P99_MAE_RM": 242541.53276562208,
+          "P99_P100_count": 39,
+          "P99_P100_RMSE_RM": 776311.9682029,
+          "P99_P100_MAE_RM": 596893.8002400963
+        }
+      }
+    }
+  },
+  "stability": {
+    "random_forest": {
+      "scenarios": {
+        "A": {
+          "RMSE_RM": 126037.41630339062,
+          "MAE_RM": 61591.39375864719
+        },
+        "B": {
+          "RMSE_RM": 125115.274556188,
+          "MAE_RM": 61434.97328188159
+        },
+        "C": {
+          "RMSE_RM": 139493.56019003675,
+          "MAE_RM": 67009.81840803406
+        }
+      },
+      "B_minus_A": {
+        "RMSE_RM": -922.1417472026224,
+        "MAE_RM": -156.4204767655974
+      },
+      "C_minus_B": {
+        "RMSE_RM": 14378.285633848747,
+        "MAE_RM": 5574.845126152468
+      },
+      "C_minus_A": {
+        "RMSE_RM": 13456.143886646125,
+        "MAE_RM": 5418.42464938687
+      }
+    },
+    "lightgbm_interaction": {
+      "scenarios": {
+        "A": {
+          "RMSE_RM": 123410.3780721812,
+          "MAE_RM": 63205.79836251199
+        },
+        "B": {
+          "RMSE_RM": 123687.30753439068,
+          "MAE_RM": 62101.24305633339
+        },
+        "C": {
+          "RMSE_RM": 132451.28841558326,
+          "MAE_RM": 66829.1544988059
+        }
+      },
+      "B_minus_A": {
+        "RMSE_RM": 276.9294622094749,
+        "MAE_RM": -1104.5553061785977
+      },
+      "C_minus_B": {
+        "RMSE_RM": 8763.980881192576,
+        "MAE_RM": 4727.911442472512
+      },
+      "C_minus_A": {
+        "RMSE_RM": 9040.91034340205,
+        "MAE_RM": 3623.3561362939145
+      }
+    },
+    "building_name_te": {
+      "scenarios": {
+        "A": {
+          "RMSE_RM": 124222.18728727462,
+          "MAE_RM": 63223.08897445429
+        },
+        "B": {
+          "RMSE_RM": 122449.57178005652,
+          "MAE_RM": 62164.93420909483
+        },
+        "C": {
+          "RMSE_RM": 132741.8433922035,
+          "MAE_RM": 67014.93047828709
+        }
+      },
+      "B_minus_A": {
+        "RMSE_RM": -1772.615507218099,
+        "MAE_RM": -1058.1547653594607
+      },
+      "C_minus_B": {
+        "RMSE_RM": 10292.271612146986,
+        "MAE_RM": 4849.996269192263
+      },
+      "C_minus_A": {
+        "RMSE_RM": 8519.656104928887,
+        "MAE_RM": 3791.841503832802
+      }
+    },
+    "position_regex_lightgbm": {
+      "scenarios": {
+        "A": {
+          "RMSE_RM": 122822.64306366096,
+          "MAE_RM": 63280.41233336591
+        },
+        "B": {
+          "RMSE_RM": 122730.61964179797,
+          "MAE_RM": 61914.61545985387
+        },
+        "C": {
+          "RMSE_RM": 131799.71256584063,
+          "MAE_RM": 66703.74785193184
+        }
+      },
+      "B_minus_A": {
+        "RMSE_RM": -92.02342186299211,
+        "MAE_RM": -1365.7968735120376
+      },
+      "C_minus_B": {
+        "RMSE_RM": 9069.092924042663,
+        "MAE_RM": 4789.132392077969
+      },
+      "C_minus_A": {
+        "RMSE_RM": 8977.069502179671,
+        "MAE_RM": 3423.335518565931
+      }
+    }
+  },
+  "rankings": {
+    "A": {
+      "RMSE_order": [
+        "position_regex_lightgbm",
+        "lightgbm_interaction",
+        "building_name_te",
+        "random_forest"
+      ],
+      "MAE_order": [
+        "random_forest",
+        "lightgbm_interaction",
+        "building_name_te",
+        "position_regex_lightgbm"
+      ],
+      "best_by_RMSE": "position_regex_lightgbm",
+      "best_by_MAE": "random_forest",
+      "position_best_by_RMSE": true,
+      "position_best_by_MAE": false,
+      "position_best_by_both": false
+    },
+    "B": {
+      "RMSE_order": [
+        "building_name_te",
+        "position_regex_lightgbm",
+        "lightgbm_interaction",
+        "random_forest"
+      ],
+      "MAE_order": [
+        "random_forest",
+        "position_regex_lightgbm",
+        "lightgbm_interaction",
+        "building_name_te"
+      ],
+      "best_by_RMSE": "building_name_te",
+      "best_by_MAE": "random_forest",
+      "position_best_by_RMSE": false,
+      "position_best_by_MAE": false,
+      "position_best_by_both": false
+    },
+    "C": {
+      "RMSE_order": [
+        "position_regex_lightgbm",
+        "lightgbm_interaction",
+        "building_name_te",
+        "random_forest"
+      ],
+      "MAE_order": [
+        "position_regex_lightgbm",
+        "lightgbm_interaction",
+        "random_forest",
+        "building_name_te"
+      ],
+      "best_by_RMSE": "position_regex_lightgbm",
+      "best_by_MAE": "position_regex_lightgbm",
+      "position_best_by_RMSE": true,
+      "position_best_by_MAE": true,
+      "position_best_by_both": true
+    }
+  },
+  "bootstrap": {
+    "samples": 5000,
+    "paired_on_common_oof_rows": true,
+    "difference_definition": "Position-regex LightGBM minus reference; negative is better",
+    "statistically_reliable_advantages": {
+      "A": {
+        "random_forest": {
+          "RMSE": false,
+          "MAE": false
+        },
+        "lightgbm_interaction": {
+          "RMSE": false,
+          "MAE": false
+        },
+        "building_name_te": {
+          "RMSE": false,
+          "MAE": false
+        }
+      },
+      "B": {
+        "random_forest": {
+          "RMSE": false,
+          "MAE": false
+        },
+        "lightgbm_interaction": {
+          "RMSE": false,
+          "MAE": false
+        },
+        "building_name_te": {
+          "RMSE": false,
+          "MAE": false
+        }
+      },
+      "C": {
+        "random_forest": {
+          "RMSE": false,
+          "MAE": false
+        },
+        "lightgbm_interaction": {
+          "RMSE": false,
+          "MAE": false
+        },
+        "building_name_te": {
+          "RMSE": false,
+          "MAE": false
+        }
+      }
+    }
+  },
+  "answers": {
+    "position_regex_best_by_both_in_every_scenario": false,
+    "position_regex_advantage_reliable_on_both_metrics_vs_every_reference_in_every_scenario": false,
+    "level3_materially_changes_position_rmse_vs_scenario_b_at_5_percent_threshold": true,
+    "level3_interpretation": "Level 3 materially changes RMSE under the pre-specified 5% threshold; it may include legitimate separate units sharing structured attributes.",
+    "most_defensible_reporting_scenario": "Scenario B",
+    "reporting_rationale": "Scenario B protects exact and strong description-matched repeats while avoiding the broader Level-3 assumption that identical structured attributes necessarily identify the same listing/unit. Report Scenario C alongside it as a conservative sensitivity bound."
+  },
+  "leakage_controls": {
+    "outer_preprocessing_training_fold_only": true,
+    "building_target_encoding_outer_training_only": true,
+    "building_target_encoding_inner_oof": true,
+    "regex_features_target_free": true,
+    "validation_targets_used_for_fit_or_features": false,
+    "all_models_within_scenario_use_identical_folds": true,
+    "fit_audit": [
+      {
+        "scenario": "A",
+        "model": "random_forest",
+        "fold": 1,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "scenario": "A",
+        "model": "random_forest",
+        "fold": 2,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "scenario": "A",
+        "model": "random_forest",
+        "fold": 3,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "scenario": "A",
+        "model": "random_forest",
+        "fold": 4,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "scenario": "A",
+        "model": "random_forest",
+        "fold": 5,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "scenario": "A",
+        "model": "lightgbm_interaction",
+        "fold": 1,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "scenario": "A",
+        "model": "lightgbm_interaction",
+        "fold": 2,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "scenario": "A",
+        "model": "lightgbm_interaction",
+        "fold": 3,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "scenario": "A",
+        "model": "lightgbm_interaction",
+        "fold": 4,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "scenario": "A",
+        "model": "lightgbm_interaction",
+        "fold": 5,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "scenario": "A",
+        "model": "building_name_te",
+        "fold": 1,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "scenario": "A",
+        "model": "building_name_te",
+        "fold": 2,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "scenario": "A",
+        "model": "building_name_te",
+        "fold": 3,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "scenario": "A",
+        "model": "building_name_te",
+        "fold": 4,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "scenario": "A",
+        "model": "building_name_te",
+        "fold": 5,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "scenario": "A",
+        "model": "position_regex_lightgbm",
+        "fold": 1,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "scenario": "A",
+        "model": "position_regex_lightgbm",
+        "fold": 2,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "scenario": "A",
+        "model": "position_regex_lightgbm",
+        "fold": 3,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "scenario": "A",
+        "model": "position_regex_lightgbm",
+        "fold": 4,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "scenario": "A",
+        "model": "position_regex_lightgbm",
+        "fold": 5,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "scenario": "B",
+        "model": "random_forest",
+        "fold": 1,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "scenario": "B",
+        "model": "random_forest",
+        "fold": 2,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "scenario": "B",
+        "model": "random_forest",
+        "fold": 3,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "scenario": "B",
+        "model": "random_forest",
+        "fold": 4,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "scenario": "B",
+        "model": "random_forest",
+        "fold": 5,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "scenario": "B",
+        "model": "lightgbm_interaction",
+        "fold": 1,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "scenario": "B",
+        "model": "lightgbm_interaction",
+        "fold": 2,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "scenario": "B",
+        "model": "lightgbm_interaction",
+        "fold": 3,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "scenario": "B",
+        "model": "lightgbm_interaction",
+        "fold": 4,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "scenario": "B",
+        "model": "lightgbm_interaction",
+        "fold": 5,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "scenario": "B",
+        "model": "building_name_te",
+        "fold": 1,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "scenario": "B",
+        "model": "building_name_te",
+        "fold": 2,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "scenario": "B",
+        "model": "building_name_te",
+        "fold": 3,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "scenario": "B",
+        "model": "building_name_te",
+        "fold": 4,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "scenario": "B",
+        "model": "building_name_te",
+        "fold": 5,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "scenario": "B",
+        "model": "position_regex_lightgbm",
+        "fold": 1,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "scenario": "B",
+        "model": "position_regex_lightgbm",
+        "fold": 2,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "scenario": "B",
+        "model": "position_regex_lightgbm",
+        "fold": 3,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "scenario": "B",
+        "model": "position_regex_lightgbm",
+        "fold": 4,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "scenario": "B",
+        "model": "position_regex_lightgbm",
+        "fold": 5,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "scenario": "C",
+        "model": "random_forest",
+        "fold": 1,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "scenario": "C",
+        "model": "random_forest",
+        "fold": 2,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "scenario": "C",
+        "model": "random_forest",
+        "fold": 3,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "scenario": "C",
+        "model": "random_forest",
+        "fold": 4,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "scenario": "C",
+        "model": "random_forest",
+        "fold": 5,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false
+      },
+      {
+        "scenario": "C",
+        "model": "lightgbm_interaction",
+        "fold": 1,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "scenario": "C",
+        "model": "lightgbm_interaction",
+        "fold": 2,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "scenario": "C",
+        "model": "lightgbm_interaction",
+        "fold": 3,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "scenario": "C",
+        "model": "lightgbm_interaction",
+        "fold": 4,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "scenario": "C",
+        "model": "lightgbm_interaction",
+        "fold": 5,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": false
+      },
+      {
+        "scenario": "C",
+        "model": "building_name_te",
+        "fold": 1,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "scenario": "C",
+        "model": "building_name_te",
+        "fold": 2,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "scenario": "C",
+        "model": "building_name_te",
+        "fold": 3,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "scenario": "C",
+        "model": "building_name_te",
+        "fold": 4,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "scenario": "C",
+        "model": "building_name_te",
+        "fold": 5,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "target_encoding_inner_oof": true,
+        "validation_target_used": false,
+        "selected_m": 5.0
+      },
+      {
+        "scenario": "C",
+        "model": "position_regex_lightgbm",
+        "fold": 1,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "scenario": "C",
+        "model": "position_regex_lightgbm",
+        "fold": 2,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "scenario": "C",
+        "model": "position_regex_lightgbm",
+        "fold": 3,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "scenario": "C",
+        "model": "position_regex_lightgbm",
+        "fold": 4,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      },
+      {
+        "scenario": "C",
+        "model": "position_regex_lightgbm",
+        "fold": 5,
+        "group_overlap": 0,
+        "target_encoding_outer_training_only": true,
+        "validation_target_used": false,
+        "regex_target_free": true
+      }
+    ]
+  },
+  "metric_thresholds": {
+    "p95": 905000.0,
+    "p99": 1700000.0
+  },
+  "reproducibility": {
+    "python": "3.14.0",
+    "pandas": "3.0.3",
+    "scikit_learn": "1.9.0",
+    "lightgbm": "4.7.0",
+    "random_state": 42,
+    "bootstrap_samples": 5000
+  },
+  "production_safety": {
+    "protected_file_count": 224,
+    "before_manifest_sha256": "b7f12d431aac808260a1d19acc9895ac005756f61cd0b0a1598e65e07f6e6ec9",
+    "after_manifest_sha256": "b7f12d431aac808260a1d19acc9895ac005756f61cd0b0a1598e65e07f6e6ec9",
+    "all_files_outside_new_experiment_unchanged": true,
+    "canonical_dataset_unchanged": true
+  },
+  "artifacts": [
+    "experiments/repeat_group_sensitivity/results.json",
+    "experiments/repeat_group_sensitivity/sensitivity_model_comparison.csv",
+    "experiments/repeat_group_sensitivity/fold_metrics.csv",
+    "experiments/repeat_group_sensitivity/oof_predictions.csv",
+    "experiments/repeat_group_sensitivity/scenario_a_fold_assignments.csv",
+    "experiments/repeat_group_sensitivity/scenario_b_fold_assignments.csv",
+    "experiments/repeat_group_sensitivity/scenario_c_fold_assignments.csv",
+    "experiments/repeat_group_sensitivity/repeat_diagnostics.csv",
+    "experiments/repeat_group_sensitivity/bootstrap_results.csv",
+    "experiments/repeat_group_sensitivity/run_experiment.py",
+    "experiments/repeat_group_sensitivity/test_invariants.py"
+  ],
+  "runtime_seconds": 120.92290460004006
+}

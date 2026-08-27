@@ -1,0 +1,52 @@
+{
+  "dataset": "production_prepared_dataset.csv",
+  "rows": 3791,
+  "columns": 22,
+  "split": {
+    "test_size": 0.2,
+    "random_state": 42
+  },
+  "added_features": [
+    "city",
+    "completion_year",
+    "number_of_floors",
+    "total_units"
+  ],
+  "results": {
+    "Ridge Regression": {
+      "RMSE": 143543.09,
+      "MAE": 89907.35,
+      "R2": 0.79
+    },
+    "Random Forest": {
+      "RMSE": 131089.17,
+      "MAE": 72202.27,
+      "R2": 0.82
+    },
+    "Gradient Boosting": {
+      "RMSE": 130069.78,
+      "MAE": 72667.87,
+      "R2": 0.83
+    },
+    "KNN": {
+      "RMSE": 158671.05,
+      "MAE": 89321.38,
+      "R2": 0.74
+    },
+    "Gradient Boosting (Price/sq.ft.)": {
+      "RMSE": 123625.21,
+      "MAE": 70577.53,
+      "R2": 0.84
+    }
+  },
+  "previous_best": {
+    "model": "Random Forest",
+    "RMSE": 147294.14,
+    "MAE": 82922.56
+  },
+  "new_best_by_rmse": {
+    "model": "Gradient Boosting (Price/sq.ft.)",
+    "RMSE": 123625.21,
+    "MAE": 70577.53
+  }
+}

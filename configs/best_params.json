@@ -1,0 +1,30 @@
+{
+  "status": "tuned",
+  "cv": 5,
+  "scoring": "neg_root_mean_squared_error",
+  "parameters": {
+    "Ridge Regression": {
+      "alpha": 10.0
+    },
+    "Random Forest": {
+      "max_depth": 15,
+      "min_samples_split": 5,
+      "n_estimators": 100
+    },
+    "Gradient Boosting": {
+      "learning_rate": 0.1,
+      "max_depth": 5,
+      "n_estimators": 200
+    },
+    "KNN": {
+      "n_neighbors": 9,
+      "weights": "distance"
+    }
+  },
+  "cv_rmse": {
+    "Ridge Regression": 194242.37203661999,
+    "Random Forest": 178794.72130044064,
+    "Gradient Boosting": 173649.34541888224,
+    "KNN": 199402.5073138142
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "method": "predefined domain-motivated case-insensitive regex over cleaned description text",
+  "minimum_frequency_for_modeling": 10,
+  "frequencies": {
+    "is_penthouse": 41,
+    "is_duplex_text": 60,
+    "is_triplex": 2,
+    "is_corner_unit": 208,
+    "has_private_lift": 14,
+    "has_private_pool": 4,
+    "has_balcony": 355,
+    "has_sea_view": 33,
+    "has_city_view": 43,
+    "has_klcc_view": 20,
+    "is_high_floor_text": 226,
+    "is_luxury_text": 96,
+    "is_designer_unit": 0,
+    "is_fully_renovated_text": 293,
+    "is_fully_furnished_text": 445,
+    "is_dual_key": 44,
+    "is_garden_unit": 8,
+    "is_loft": 9
+  },
+  "modeled_features": [
+    "is_penthouse",
+    "is_duplex_text",
+    "is_corner_unit",
+    "has_private_lift",
+    "has_balcony",
+    "has_sea_view",
+    "has_city_view",
+    "has_klcc_view",
+    "is_high_floor_text",
+    "is_luxury_text",
+    "is_fully_renovated_text",
+    "is_fully_furnished_text",
+    "is_dual_key"
+  ],
+  "excluded_rare_features": [
+    "is_triplex",
+    "has_private_pool",
+    "is_designer_unit",
+    "is_garden_unit",
+    "is_loft"
+  ],
+  "target_used_for_feature_definition": false,
+  "coordinate_features_used": false
+}

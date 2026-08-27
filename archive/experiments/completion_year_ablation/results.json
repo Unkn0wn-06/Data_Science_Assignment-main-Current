@@ -1,0 +1,22 @@
+{
+  "dataset": "production_prepared_dataset.csv",
+  "rows": 3791,
+  "split": {
+    "test_size": 0.2,
+    "random_state": 42
+  },
+  "decision": "retain completion_year",
+  "reason": "Removing completion_year worsened the best aggregate RMSE and MAE.",
+  "with_completion_year": {
+    "Ridge Regression": {"RMSE": 143543.09, "MAE": 89907.35, "R2": 0.79},
+    "Random Forest": {"RMSE": 131089.17, "MAE": 72202.27, "R2": 0.82},
+    "Gradient Boosting": {"RMSE": 130069.78, "MAE": 72667.87, "R2": 0.83},
+    "KNN": {"RMSE": 158671.05, "MAE": 89321.38, "R2": 0.74}
+  },
+  "without_completion_year": {
+    "Ridge Regression": {"RMSE": 145064.93, "MAE": 90907.81, "R2": 0.78},
+    "Random Forest": {"RMSE": 137190.56, "MAE": 74464.28, "R2": 0.81},
+    "Gradient Boosting": {"RMSE": 144793.54, "MAE": 75115.07, "R2": 0.78},
+    "KNN": {"RMSE": 157781.86, "MAE": 88977.76, "R2": 0.74}
+  }
+}

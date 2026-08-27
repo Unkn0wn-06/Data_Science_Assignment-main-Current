@@ -1,0 +1,45 @@
+feature,group,count,percentage,frequency_class,modeled
+is_penthouse,layout,41,1.081508836718544,moderate,True
+is_duplex_text,layout,60,1.5826958586125033,moderate,True
+is_triplex,layout,2,0.052756528620416784,extremely rare,False
+is_loft,layout,9,0.2374043787918755,rare,False
+is_dual_key,layout,44,1.1606436296491691,moderate,True
+is_studio_text,layout,85,2.242152466367713,moderate,True
+is_corner_unit,layout,240,6.330783434450013,common,True
+is_end_lot_text,layout,19,0.5011870218939594,moderate,True
+is_garden_unit,layout,8,0.21102611448166714,rare,False
+has_private_lift,private_luxury,14,0.3692957003429174,moderate,True
+has_private_lift_lobby,private_luxury,1,0.026378264310208392,extremely rare,False
+has_private_pool,private_luxury,4,0.10551305724083357,rare,False
+has_private_garden,private_luxury,7,0.1846478501714587,rare,False
+has_private_entrance,private_luxury,0,0.0,extremely rare,False
+is_luxury_text,private_luxury,80,2.110261144816671,moderate,True
+is_premium_text,private_luxury,22,0.5803218148245846,moderate,True
+is_exclusive_text,private_luxury,39,1.0287523080981271,moderate,True
+is_luxurious_text,private_luxury,18,0.474808757583751,moderate,True
+is_branded_residence,private_luxury,0,0.0,extremely rare,False
+has_sea_view,views,33,0.8704827222368767,moderate,True
+has_city_view,views,43,1.1342653653389607,moderate,True
+has_klcc_view,views,20,0.5275652862041678,moderate,True
+has_pool_view,views,67,1.767343708783962,moderate,True
+has_golf_view,views,11,0.2901609074122923,moderate,True
+has_unblocked_view,views,30,0.7913479293062516,moderate,True
+has_panorama_view,views,2,0.052756528620416784,extremely rare,False
+is_high_floor_text,position,226,5.961487734107096,common,True
+is_low_floor_text,position,86,2.2685307306779214,moderate,True
+is_top_floor_text,position,32,0.8441044579266685,moderate,True
+has_balcony,position,355,9.364283830123977,common,True
+has_large_balcony,position,17,0.4484304932735426,moderate,True
+is_fully_furnished_text,renovation_furnishing,445,11.738327618042733,common,True
+is_partly_furnished_text,renovation_furnishing,376,9.918227380638355,common,True
+is_unfurnished_text,renovation_furnishing,53,1.3980480084410445,moderate,True
+is_fully_renovated_text,renovation_furnishing,293,7.7288314428910585,common,True
+is_designer_unit,renovation_furnishing,0,0.0,extremely rare,False
+has_kitchen_cabinet,renovation_furnishing,531,14.006858348720655,common,True
+has_built_in_wardrobe,renovation_furnishing,41,1.081508836718544,moderate,True
+has_air_conditioning,renovation_furnishing,299,7.8871010287523085,common,True
+is_urgent_sale,sale_context,6,0.1582695858612503,rare,False
+is_below_market,sale_context,264,6.963861777895014,common,True
+is_owner_listing,sale_context,11,0.2901609074122923,moderate,True
+is_tenanted,sale_context,164,4.326035346874176,common,True
+is_vacant,sale_context,45,1.1870218939593775,moderate,True

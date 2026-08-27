@@ -1,0 +1,37 @@
+{
+  "rows": 3791,
+  "city_categories": 149,
+  "detailed_address_categories": 1827,
+  "results": {
+    "detailed_address_only": {
+      "feature_count": 32,
+      "metrics": {
+        "RMSE": 125661.03801078312,
+        "MAE": 62607.40377780881,
+        "median_absolute_error": 33718.07029484934,
+        "within_RM_1000_rate": 0.021102611448166712,
+        "R2": 0.8547281496823631
+      }
+    },
+    "city_only": {
+      "feature_count": 32,
+      "metrics": {
+        "RMSE": 123231.38594227468,
+        "MAE": 61189.660400189256,
+        "median_absolute_error": 32702.591930884693,
+        "within_RM_1000_rate": 0.01899235030335004,
+        "R2": 0.860291494082739
+      }
+    },
+    "detailed_address_and_city": {
+      "feature_count": 33,
+      "metrics": {
+        "RMSE": 123691.88843896659,
+        "MAE": 61120.8964475016,
+        "median_absolute_error": 32410.235448999563,
+        "within_RM_1000_rate": 0.017409654444737535,
+        "R2": 0.8592453916814762
+      }
+    }
+  }
+}

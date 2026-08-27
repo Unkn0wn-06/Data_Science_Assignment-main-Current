@@ -1,0 +1,57 @@
+{
+  "validation": "Scenario B leakage-safe group cross-validation",
+  "selected_final_model": "LightGBM + Position Features",
+  "lowest_rmse_model": "LightGBM + Position Features",
+  "lowest_mae_model": "Random Forest",
+  "selection_rationale": "LightGBM with position features was selected as the final model because it provided competitive and balanced RMSE and MAE while incorporating meaningful property-position information from listing descriptions. Differences from the strongest competing models were not statistically significant at the 95% confidence level.",
+  "models": [
+    {
+      "Model": "LightGBM + Position Features",
+      "RMSE_RM": 122730.61964179797,
+      "MAE_RM": 61914.61545985387,
+      "R2": 0.8614246333849803,
+      "Adjusted_R2": 0.8596845740125769,
+      "Median_AE_RM": 33747.41704834136,
+      "Top5_RMSE_RM": 429553.42393954756,
+      "Top5_MAE_RM": 292878.4111209925,
+      "RMSE_Rank": 1,
+      "MAE_Rank": 2
+    },
+    {
+      "Model": "Random Forest",
+      "RMSE_RM": 125115.274556188,
+      "MAE_RM": 61434.97328188159,
+      "R2": 0.8559872813471051,
+      "Adjusted_R2": 0.8547609889051433,
+      "Median_AE_RM": 32940.87114339473,
+      "Top5_RMSE_RM": 443878.2280709026,
+      "Top5_MAE_RM": 289233.929968264,
+      "RMSE_Rank": 2,
+      "MAE_Rank": 1
+    },
+    {
+      "Model": "Gradient Boosting",
+      "RMSE_RM": 128882.87857175295,
+      "MAE_RM": 63363.75760496543,
+      "R2": 0.8471833632764538,
+      "Adjusted_R2": 0.8458821039962108,
+      "Median_AE_RM": 34945.679862879915,
+      "Top5_RMSE_RM": 459511.39070635766,
+      "Top5_MAE_RM": 296664.27233851945,
+      "RMSE_Rank": 3,
+      "MAE_Rank": 3
+    },
+    {
+      "Model": "Ridge Regression",
+      "RMSE_RM": 145209.18990447978,
+      "MAE_RM": 75561.38457438708,
+      "R2": 0.8060148934886255,
+      "Adjusted_R2": 0.8043630777865596,
+      "Median_AE_RM": 47208.49260205706,
+      "Top5_RMSE_RM": 520739.61873189977,
+      "Top5_MAE_RM": 330262.97761440615,
+      "RMSE_Rank": 4,
+      "MAE_Rank": 4
+    }
+  ]
+}

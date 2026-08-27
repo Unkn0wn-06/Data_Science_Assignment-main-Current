@@ -1,0 +1,84 @@
+{
+  "status": "tuned",
+  "search": "RandomizedSearchCV",
+  "cv": 5,
+  "selection": "minimum combined RMSE and MAE rank",
+  "iterations": {
+    "Ridge Regression": 60,
+    "Random Forest": 80,
+    "Gradient Boosting": 100,
+    "KNN": 60
+  },
+  "parameters": {
+    "Ridge Regression": {
+      "preprocessor__numeric__scaler__with_mean": true,
+      "preprocessor__numeric__imputer__strategy": "median",
+      "preprocessor__categorical__onehot__min_frequency": null,
+      "preprocessor__categorical__onehot__drop": "first",
+      "model__tol": 0.0001,
+      "model__solver": "sag",
+      "model__max_iter": 5000,
+      "model__fit_intercept": true,
+      "model__alpha": 1.0
+    },
+    "Random Forest": {
+      "preprocessor__numeric__imputer__strategy": "median",
+      "preprocessor__categorical__onehot__min_frequency": 2,
+      "preprocessor__categorical__onehot__drop": null,
+      "model__n_jobs": -1,
+      "model__n_estimators": 400,
+      "model__min_samples_split": 4,
+      "model__min_samples_leaf": 2,
+      "model__max_leaf_nodes": 400,
+      "model__max_features": 0.75,
+      "model__max_depth": 24,
+      "model__criterion": "poisson",
+      "model__bootstrap": true
+    },
+    "Gradient Boosting": {
+      "preprocessor__numeric__imputer__strategy": "mean",
+      "preprocessor__categorical__onehot__min_frequency": 20,
+      "preprocessor__categorical__onehot__drop": null,
+      "model__subsample": 0.75,
+      "model__n_estimators": 250,
+      "model__min_samples_split": 2,
+      "model__min_samples_leaf": 1,
+      "model__max_features": null,
+      "model__max_depth": 6,
+      "model__loss": "huber",
+      "model__learning_rate": 0.1,
+      "model__alpha": 0.9
+    },
+    "KNN": {
+      "preprocessor__numeric__scaler__with_std": true,
+      "preprocessor__numeric__scaler__with_mean": true,
+      "preprocessor__numeric__imputer__strategy": "median",
+      "preprocessor__categorical__onehot__min_frequency": 10,
+      "preprocessor__categorical__onehot__drop": null,
+      "model__weights": "uniform",
+      "model__p": 1,
+      "model__n_neighbors": 5,
+      "model__metric": "minkowski",
+      "model__leaf_size": 60,
+      "model__algorithm": "brute"
+    }
+  },
+  "cv_scores": {
+    "Ridge Regression": {
+      "RMSE": 189272.11310734664,
+      "MAE": 105394.1717330772
+    },
+    "Random Forest": {
+      "RMSE": 163251.6151807346,
+      "MAE": 85835.96773497426
+    },
+    "Gradient Boosting": {
+      "RMSE": 155412.22110916788,
+      "MAE": 82753.15515986379
+    },
+    "KNN": {
+      "RMSE": 190541.0797660585,
+      "MAE": 101353.21545491132
+    }
+  }
+}

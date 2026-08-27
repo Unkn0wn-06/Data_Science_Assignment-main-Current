@@ -1,0 +1,66 @@
+{
+  "rows": 3791,
+  "features": 32,
+  "results": {
+    "direct_price": {
+      "Extra Trees": {
+        "RMSE": 157865.22065351586,
+        "MAE": 70930.7466671063,
+        "median_absolute_error": 36015.0,
+        "within_RM_1000_rate": 0.020047480875758375,
+        "R2": 0.770726899323338
+      },
+      "Random Forest": {
+        "RMSE": 151146.30824503337,
+        "MAE": 69263.57560525555,
+        "median_absolute_error": 35742.003999999986,
+        "within_RM_1000_rate": 0.017409654444737535,
+        "R2": 0.7898277999293543
+      },
+      "Gradient Boosting": {
+        "RMSE": 153421.0900695826,
+        "MAE": 73660.5896053534,
+        "median_absolute_error": 40563.20657517749,
+        "within_RM_1000_rate": 0.01424426272751253,
+        "R2": 0.7834539278148692
+      },
+      "Histogram Gradient Boosting": {
+        "RMSE": 179697.82565524348,
+        "MAE": 76337.56061969572,
+        "median_absolute_error": 38318.14421626658,
+        "within_RM_1000_rate": 0.013716697441308361,
+        "R2": 0.7029251908374208
+      }
+    },
+    "price_per_square_foot": {
+      "Extra Trees": {
+        "RMSE": 130752.33904282626,
+        "MAE": 63973.677488878326,
+        "median_absolute_error": 33841.83217035237,
+        "within_RM_1000_rate": 0.02374043787918755,
+        "R2": 0.8427179663402151
+      },
+      "Random Forest": {
+        "RMSE": 129338.84995420913,
+        "MAE": 63028.351006088815,
+        "median_absolute_error": 33789.9418943089,
+        "within_RM_1000_rate": 0.019519915589554206,
+        "R2": 0.8461001585337402
+      },
+      "Gradient Boosting": {
+        "RMSE": 137302.80767923765,
+        "MAE": 66416.41253082923,
+        "median_absolute_error": 36540.37510943995,
+        "within_RM_1000_rate": 0.016090741229227115,
+        "R2": 0.8265640918501772
+      },
+      "Histogram Gradient Boosting": {
+        "RMSE": 129513.15175587013,
+        "MAE": 64775.4502819768,
+        "median_absolute_error": 34311.56819884048,
+        "within_RM_1000_rate": 0.016618306515431284,
+        "R2": 0.8456850768340801
+      }
+    }
+  }
+}
