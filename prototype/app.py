@@ -27,6 +27,11 @@ from src.models.final.position_regex_lightgbm import (
     fit_final_model,
     predict_total_price,
 )
+from src.models.final.trimmed_market import (
+    EXPERIMENTAL_TRIM_LEVELS,
+    fit_trimmed_market_model,
+    get_trim_market_metadata,
+)
 
 
 DATA_PATH = PROJECT_ROOT / "data" / "processed" / "enhanced_city_dataset.csv"
@@ -36,6 +41,9 @@ OOF_PATH = RESULTS_DIR / "oof_predictions.csv"
 IMPORTANCE_PATH = RESULTS_DIR / "feature_importance.csv"
 TRIMMING_RESULTS_DIR = PROJECT_ROOT / "results" / "outlier_trimming"
 TRIMMING_METADATA_PATH = TRIMMING_RESULTS_DIR / "metadata.json"
+ALL_MODELS_TRIMMING_PATH = (
+    TRIMMING_RESULTS_DIR / "all_models_trimmed_market_summary.csv"
+)
 VIEWS = (
     "Model Comparison",
     "Feature Importance",
@@ -43,6 +51,8 @@ VIEWS = (
     "Outlier & Trimming Analysis",
     "Live House Price Predictor",
 )
+FURNISHING_STATUS_VALUES = {"Unfurnished": 0, "Furnished": 1}
+RENOVATION_STATUS_VALUES = {"Not Renovated": 0, "Renovated": 1}
 
 
 @st.cache_data
@@ -141,6 +151,47 @@ def load_trimming_results() -> tuple[dict, dict[str, pd.DataFrame]]:
     return metadata, tables
 
 
+@st.cache_data
+def load_all_models_trimming_summary() -> pd.DataFrame:
+    """Load the validated all-model restricted-market comparison artifact."""
+    summary = pd.read_csv(ALL_MODELS_TRIMMING_PATH)
+    required = [
+        "Model",
+        "Trim_Level",
+        "Removal_Percent",
+        "Original_Rows",
+        "Retained_Rows",
+        "Removed_Rows",
+        "Retention_Percentage",
+        "RMSE_RM",
+        "MAE_RM",
+        "R2",
+        "Adjusted_R2",
+    ]
+    if list(summary.columns) != required:
+        raise ValueError("All-model trimming summary has an unexpected schema.")
+    expected_levels = ["0%", "0.5%", "1%", "2.5%", "5%", "10%"]
+    if len(summary) != 24 or set(summary["Model"]) != set(FINAL_MODELS):
+        raise ValueError("All-model trimming summary must contain exactly 24 rows.")
+    if summary.duplicated(["Model", "Trim_Level"]).any():
+        raise ValueError("All-model trimming summary contains duplicate model/trim pairs.")
+    for model_name in FINAL_MODELS:
+        levels = summary.loc[
+            summary["Model"].eq(model_name), "Trim_Level"
+        ].tolist()
+        if levels != expected_levels:
+            raise ValueError(f"All-model trimming levels are incomplete for {model_name}.")
+    if not (
+        summary.groupby("Trim_Level", sort=False)["Retained_Rows"].nunique() == 1
+    ).all():
+        raise ValueError("All models must use identical retained rows per trim level.")
+    if not np.isfinite(
+        summary[["RMSE_RM", "MAE_RM", "R2", "Adjusted_R2"]].to_numpy(float)
+    ).all():
+        raise ValueError("All-model trimming summary contains non-finite metrics.")
+    return summary
+
+
 @st.cache_resource
 def load_deployment_model():
     """Fit only the selected final model, once per Streamlit process."""
@@ -150,8 +201,18 @@ def load_deployment_model():
     return model
 
 
+@st.cache_resource
+def load_trimmed_deployment_model(trim_level: float):
+    """Fit and cache one experimental deployment model per saved trim level."""
+    model = fit_trimmed_market_model(trim_level)
+    metadata = get_trim_market_metadata(trim_level)
+    if model.training_rows_ != metadata["retained_rows"]:
+        raise AssertionError("Trimmed deployment model used an unexpected row count.")
+    return model
+
+
 def comparison_frame(payload: dict) -> pd.DataFrame:
-    return pd.DataFrame(payload["models"]).loc[
+    frame = pd.DataFrame(payload["models"]).loc[
         :, [
             "Model",
             "RMSE_RM",
@@ -160,6 +221,7 @@ def comparison_frame(payload: dict) -> pd.DataFrame:
             "Adjusted_R2",
         ]
     ]
+    return frame.set_index("Model").loc[list(FINAL_MODELS)].reset_index()
 
 
 def comparison_display_frame(payload: dict) -> pd.DataFrame:
@@ -179,46 +241,55 @@ def category_values(data: pd.DataFrame, column: str) -> list[str]:
     return choices or ["Unknown"]
 
 
+def condition_feature_values(
+    furnishing_status: str,
+    renovation_status: str,
+) -> dict[str, int]:
+    """Map the two independent structured status controls to model features."""
+    if furnishing_status not in FURNISHING_STATUS_VALUES:
+        raise ValueError(f"Unknown furnishing status: {furnishing_status}")
+    if renovation_status not in RENOVATION_STATUS_VALUES:
+        raise ValueError(f"Unknown renovation status: {renovation_status}")
+    return {
+        "is_furnished": FURNISHING_STATUS_VALUES[furnishing_status],
+        "is_renovated": RENOVATION_STATUS_VALUES[renovation_status],
+    }
+
+
 def render_comparison(payload: dict) -> None:
     st.subheader("Final Four-Model Comparison")
     table = comparison_frame(payload)
-    metric_by_model = table.set_index("Model")
-    cards = st.columns(3)
-    cards[0].metric("Selected Final Model", FINAL_MODEL_NAME)
-    cards[1].metric(
-        "Lowest RMSE",
-        payload["lowest_rmse_model"],
-        f"RM {metric_by_model.loc[payload['lowest_rmse_model'], 'RMSE_RM']:,.0f}",
-        delta_color="off",
+    model_colors = {
+        "Ridge Regression": "#2563eb",
+        "Random Forest": "#d97706",
+        "Gradient Boosting": "#db2777",
+        FINAL_MODEL_NAME: "#4d7c0f",
+    }
+    chart_specs = (
+        ("RMSE_RM", "RMSE by Model", ",.0f", "RMSE (RM)"),
+        ("MAE_RM", "MAE by Model", ",.0f", "MAE (RM)"),
+        ("R2", "R² by Model", ".4f", "R²"),
+        ("Adjusted_R2", "Adjusted R² by Model", ".4f", "Adjusted R²"),
     )
-    cards[2].metric(
-        "Lowest MAE",
-        payload["lowest_mae_model"],
-        f"RM {metric_by_model.loc[payload['lowest_mae_model'], 'MAE_RM']:,.0f}",
-        delta_color="off",
-    )
-    st.info(
-        "All reported metrics are based on the same Scenario B group-safe "
-        "5-fold validation assignments."
-    )
-    st.caption("Models: " + " | ".join(FINAL_MODELS))
-
-    for metric, title, color in (
-        ("RMSE_RM", "Root Mean Squared Error (RM)", "Oranges_r"),
-        ("MAE_RM", "Mean Absolute Error (RM)", "Reds_r"),
-        ("R2", "R² Score", "Blues"),
-    ):
-        figure = px.bar(
-            table,
-            x="Model",
-            y=metric,
-            text_auto=",.0f" if metric != "R2" else ".4f",
-            color=metric,
-            color_continuous_scale=color,
-            title=title,
-        )
-        figure.update_layout(showlegend=False, height=390)
-        st.plotly_chart(figure, width="stretch")
+    for row_start in (0, 2):
+        columns = st.columns(2)
+        for column, (metric, title, text_format, y_label) in zip(
+            columns, chart_specs[row_start : row_start + 2]
+        ):
+            figure = px.bar(
+                table,
+                x="Model",
+                y=metric,
+                text_auto=text_format,
+                color="Model",
+                color_discrete_map=model_colors,
+                category_orders={"Model": list(FINAL_MODELS)},
+                labels={metric: y_label},
+                title=title,
+            )
+            figure.update_layout(showlegend=False, height=390)
+            figure.update_yaxes(rangemode="tozero", tickformat=text_format)
+            column.plotly_chart(figure, width="stretch")
 
     st.subheader("Detailed Comparison Table")
     display = comparison_display_frame(payload)
@@ -235,7 +306,6 @@ def render_comparison(payload: dict) -> None:
         .highlight_max(subset=["R²", "Adjusted R²"], color="#d1fae5")
     )
     st.dataframe(styled, width="stretch", hide_index=True)
-    st.write(payload["selection_rationale"])
 
 
 def render_feature_importance() -> None:
@@ -343,6 +413,87 @@ def trim_label(value: float) -> str:
     return f"{value:g}%"
 
 
+def trimming_display_frame(summary: pd.DataFrame, model_name: str) -> pd.DataFrame:
+    """Create one six-row model table from saved restricted-market metrics."""
+    rows = summary.loc[
+        summary["Model"].eq(model_name),
+        ["Trim_Level", "Retained_Rows", "RMSE_RM", "MAE_RM", "R2", "Adjusted_R2"],
+    ].copy()
+    rows.columns = [
+        "Trim Level",
+        "Retained Listings",
+        "RMSE",
+        "MAE",
+        "R²",
+        "Adjusted R²",
+    ]
+    if len(rows) != 6:
+        raise ValueError(f"Expected six saved trimming rows for {model_name}.")
+    rows["Retained Listings"] = rows["Retained Listings"].astype(int)
+    return rows
+
+
+def render_all_models_trimming_comparison() -> None:
+    """Render all four models using the validated saved 24-row artifact only."""
+    st.subheader("Trimmed-Data Model Comparison")
+    summary = load_all_models_trimming_summary()
+    model_colors = {
+        "Ridge Regression": "#2563eb",
+        "Random Forest": "#d97706",
+        "Gradient Boosting": "#db2777",
+        FINAL_MODEL_NAME: "#4d7c0f",
+    }
+    chart_specs = (
+        ("RMSE_RM", "RMSE Across Trimming Levels", "RMSE (RM)"),
+        ("MAE_RM", "MAE Across Trimming Levels", "MAE (RM)"),
+        ("R2", "R² Across Trimming Levels", "R²"),
+        ("Adjusted_R2", "Adjusted R² Across Trimming Levels", "Adjusted R²"),
+    )
+    trim_order = ["0%", "0.5%", "1%", "2.5%", "5%", "10%"]
+    for row_start in (0, 2):
+        columns = st.columns(2)
+        for column, (metric, title, y_label) in zip(
+            columns, chart_specs[row_start : row_start + 2]
+        ):
+            figure = px.line(
+                summary,
+                x="Trim_Level",
+                y=metric,
+                color="Model",
+                line_dash="Model",
+                markers=True,
+                category_orders={
+                    "Trim_Level": trim_order,
+                    "Model": list(FINAL_MODELS),
+                },
+                color_discrete_map=model_colors,
+                labels={"Trim_Level": "Trim Level", metric: y_label},
+                title=title,
+            )
+            figure.update_layout(height=410, legend_title_text="")
+            figure.update_yaxes(
+                tickformat=",.0f" if metric in {"RMSE_RM", "MAE_RM"} else ".4f"
+            )
+            column.plotly_chart(figure, width="stretch")
+
+    for model_name in FINAL_MODELS:
+        st.subheader(model_name)
+        display = trimming_display_frame(summary, model_name)
+        st.dataframe(
+            display.style.format(
+                {
+                    "Retained Listings": "{:,}",
+                    "RMSE": "RM {:,.0f}",
+                    "MAE": "RM {:,.0f}",
+                    "R²": "{:.4f}",
+                    "Adjusted R²": "{:.4f}",
+                }
+            ),
+            width="stretch",
+            hide_index=True,
+        )
+
+
 def render_outlier_trimming() -> None:
     st.subheader("Outlier & Trimming Analysis")
     st.caption(
@@ -358,151 +509,224 @@ def render_outlier_trimming() -> None:
 
     metadata, tables = load_trimming_results()
     training = tables["training_only_comparison"]
-    restricted = tables["trimmed_population_comparison"]
     distribution = tables["distribution_shift"]
     retained_cv = tables["retained_cv_summary"]
+    bootstrap = tables["bootstrap_results"]
     levels = metadata["trim_levels_percent"]
     labels = [trim_label(float(value)) for value in levels]
+    production_training = training[training["Model"] == FINAL_MODEL_NAME].copy()
+    baseline_distribution = distribution.loc[
+        distribution["Removal_Percent"].eq(0.0)
+    ].iloc[0]
+
+    st.write("### Outlier Detection")
+    st.info(
+        "An extreme listing price is not automatically invalid. Canonical cleaning "
+        "removes impossible values and listings outside the established RM50–RM5,000 "
+        "PPSF plausibility range; valid premium observations remain eligible."
+    )
+    detection = pd.DataFrame(
+        {
+            "Market Statistic": [
+                "Original Listings",
+                "Median Price",
+                "90th Percentile",
+                "95th Percentile / Premium Threshold",
+                "99th Percentile",
+                "Maximum Price",
+                "Top-5% Premium Listings",
+                "PPSF Plausibility Rule",
+            ],
+            "Saved Value": [
+                f"{int(baseline_distribution['Before_Row_Count']):,}",
+                f"RM {baseline_distribution['Before_Median_Price_RM']:,.0f}",
+                f"RM {baseline_distribution['Before_P90_Price_RM']:,.0f}",
+                f"RM {baseline_distribution['Premium_Threshold_RM']:,.0f}",
+                f"RM {baseline_distribution['Before_P99_Price_RM']:,.0f}",
+                f"RM {baseline_distribution['Before_Maximum_Price_RM']:,.0f}",
+                f"{int(baseline_distribution['Premium_Rows_Retained']):,}",
+                "RM 50–RM 5,000 / sqft",
+            ],
+        }
+    )
+    st.dataframe(detection, width="stretch", hide_index=True)
+    price_landmarks = pd.DataFrame(
+        {
+            "Price Landmark": ["Median", "P90", "P95", "P99", "Maximum"],
+            "Price_RM": [
+                baseline_distribution["Before_Median_Price_RM"],
+                baseline_distribution["Before_P90_Price_RM"],
+                baseline_distribution["Before_P95_Price_RM"],
+                baseline_distribution["Before_P99_Price_RM"],
+                baseline_distribution["Before_Maximum_Price_RM"],
+            ],
+        }
+    )
+    detection_chart = px.bar(
+        price_landmarks,
+        x="Price Landmark",
+        y="Price_RM",
+        text_auto=",.0f",
+        labels={"Price_RM": "Listing Price (RM)"},
+        title="Saved Listing-Price Distribution Landmarks",
+    )
+    detection_chart.update_traces(marker_color="#64748b")
+    detection_chart.update_layout(height=390, showlegend=False)
+    detection_chart.update_yaxes(tickformat=",")
+    st.plotly_chart(detection_chart, width="stretch")
+
+    st.write("### Outlier Treatment Methods")
+    methods = pd.DataFrame(
+        [
+            {
+                "Method": "Validity and PPSF plausibility checks",
+                "Stage": "Canonical cleaning",
+                "How It Handles Outliers": "Drops impossible target/size rows and PPSF outside RM50–RM5,000",
+                "Deletes Rows?": "Yes, invalid only",
+                "Caps Values?": "No",
+                "Outcome": "Defines the eligible canonical market",
+                "Final Decision": "Keep",
+            },
+            {
+                "Method": "Exact and listing-ID duplicate removal",
+                "Stage": "Canonical cleaning",
+                "How It Handles Outliers": "Keeps one record for exact duplicates and repeated Ad List IDs",
+                "Deletes Rows?": "Yes, duplicates",
+                "Caps Values?": "No",
+                "Outcome": "Prevents duplicated listings from entering evaluation",
+                "Final Decision": "Keep",
+            },
+            {
+                "Method": "Upper-tail training-only trimming",
+                "Stage": "Saved experiment",
+                "How It Handles Outliers": "Removes expensive rows only from each outer training fold",
+                "Deletes Rows?": "Training only",
+                "Caps Values?": "No",
+                "Outcome": "Every nonzero level worsened final-model full-market RMSE and MAE",
+                "Final Decision": "Reject",
+            },
+            {
+                "Method": "Restricted-market trimming",
+                "Stage": "Saved experiment",
+                "How It Handles Outliers": "Removes the upper tail before both training and validation",
+                "Deletes Rows?": "Yes",
+                "Caps Values?": "No",
+                "Outcome": "Lower error on a narrower, easier retained market",
+                "Final Decision": "Not a full-market replacement",
+            },
+            {
+                "Method": "Winsorization, log target, Huber loss, sample weighting",
+                "Stage": "Saved experiment controls",
+                "How It Handles Outliers": "Alternative robust treatments",
+                "Deletes Rows?": "No",
+                "Caps Values?": "Not applied",
+                "Outcome": "Explicitly recorded as not applied in this trimming experiment",
+                "Final Decision": "No result claimed",
+            },
+            {
+                "Method": "Retain valid premium examples with frozen feature engineering",
+                "Stage": "Final deployment",
+                "How It Handles Outliers": "Keeps legitimate premium listings and models PPSF with existing features",
+                "Deletes Rows?": "No",
+                "Caps Values?": "No",
+                "Outcome": "Preserves the complete 3,791-listing market",
+                "Final Decision": "Selected: 0% trimming",
+            },
+        ]
+    )
+    st.dataframe(methods, width="stretch", hide_index=True)
+
+    st.write("### Market Scope After Trimming")
+    market_scope = pd.DataFrame(
+        {
+            "Trim Level": distribution["Removal_Percent"].map(trim_label),
+            "Rows Removed": (
+                distribution["Before_Row_Count"] - distribution["After_Row_Count"]
+            ).astype(int),
+            "Retention %": (
+                100 * distribution["After_Row_Count"] / distribution["Before_Row_Count"]
+            ),
+            "Maximum Retained Price": distribution["After_Maximum_Price_RM"],
+            "Mean Retained Price": distribution["After_Mean_Price_RM"],
+            "Price Skewness": distribution["After_Skewness"],
+        }
+    )
+    scope_chart = px.line(
+        market_scope,
+        x="Trim Level",
+        y="Maximum Retained Price",
+        markers=True,
+        title="Maximum Retained Price Across Trim Levels",
+    )
+    scope_chart.update_traces(line_color="#2563eb", marker_size=8)
+    scope_chart.update_layout(height=390, showlegend=False)
+    scope_chart.update_yaxes(rangemode="tozero", tickformat=",")
+    st.plotly_chart(scope_chart, width="stretch")
+    st.dataframe(
+        market_scope.style.format(
+            {
+                "Rows Removed": "{:,}",
+                "Retention %": "{:.1f}%",
+                "Maximum Retained Price": "RM {:,.0f}",
+                "Mean Retained Price": "RM {:,.0f}",
+                "Price Skewness": "{:.2f}",
+            }
+        ),
+        width="stretch",
+        hide_index=True,
+    )
+
+    st.write("### Premium Property Impact")
+    premium_impact = production_training[
+        [
+            "Removal_Percent",
+            "Top5_RMSE_RM",
+            "P95_99_RMSE_RM",
+            "P99_100_RMSE_RM",
+            "Top5_Underprediction_Pct",
+        ]
+    ].rename(
+        columns={
+            "Removal_Percent": "Trim Level",
+            "Top5_RMSE_RM": "Top-5% RMSE",
+            "P95_99_RMSE_RM": "95–99% RMSE",
+            "P99_100_RMSE_RM": "99–100% RMSE",
+            "Top5_Underprediction_Pct": "Premium Underprediction %",
+        }
+    )
+    premium_impact["Trim Level"] = premium_impact["Trim Level"].map(trim_label)
+    premium_chart = px.line(
+        premium_impact,
+        x="Trim Level",
+        y="Premium Underprediction %",
+        markers=True,
+        title="Premium Underprediction as Training Examples Are Removed",
+    )
+    premium_chart.update_traces(line_color="#dc2626", marker_size=8)
+    premium_chart.update_layout(height=390, showlegend=False)
+    st.plotly_chart(premium_chart, width="stretch")
+    st.dataframe(
+        premium_impact.style.format(
+            {
+                "Top-5% RMSE": "RM {:,.0f}",
+                "95–99% RMSE": "RM {:,.0f}",
+                "99–100% RMSE": "RM {:,.0f}",
+                "Premium Underprediction %": "{:.1f}%",
+            }
+        ),
+        width="stretch",
+        hide_index=True,
+    )
+    st.write(
+        "Premium underprediction increases as more upper-tail examples are removed "
+        "from training."
+    )
+
     selected_label = st.selectbox(
-        "Upper-tail trimming level",
+        "Retained-population trim level",
         labels,
         index=0,
         key="trim_level",
-    )
-    selected_percent = float(selected_label.removesuffix("%"))
-
-    production_training = training[training["Model"] == FINAL_MODEL_NAME].copy()
-    production_restricted = restricted[restricted["Model"] == FINAL_MODEL_NAME].copy()
-    full_row = production_training.loc[
-        production_training["Removal_Percent"] == selected_percent
-    ].iloc[0]
-    restricted_row = production_restricted.loc[
-        production_restricted["Removal_Percent"] == selected_percent
-    ].iloc[0]
-
-    st.write("### Full-Market Performance")
-    st.write(
-        "Only training-fold observations above the selected price threshold were "
-        "removed. All 3,791 listings remained in validation."
-    )
-    st.caption(
-        "Training data: selected upper tail removed | Validation/test data: full and "
-        "untouched | OOF evaluated rows: 3,791"
-    )
-    full_cards = st.columns(3)
-    full_cards[0].metric("RMSE", f"RM {full_row['RMSE_RM']:,.0f}")
-    full_cards[1].metric("MAE", f"RM {full_row['MAE_RM']:,.0f}")
-    full_cards[2].metric("R²", f"{full_row['R2']:.4f}")
-    premium_cards = st.columns(3)
-    premium_cards[0].metric("Top-5% RMSE", f"RM {full_row['Top5_RMSE_RM']:,.0f}")
-    premium_cards[1].metric(
-        "99–100% RMSE", f"RM {full_row['P99_100_RMSE_RM']:,.0f}"
-    )
-    premium_cards[2].metric(
-        "Premium Underprediction", f"{full_row['Top5_Underprediction_Pct']:.1f}%"
-    )
-
-    st.write("### Restricted-Market Performance")
-    st.write(
-        "In this evaluation, upper-tail properties are removed from both modelling "
-        "and evaluation. Lower errors therefore represent performance on a narrower "
-        "and easier housing market."
-    )
-    st.caption(
-        "Dataset first trimmed | Retained listings used for both training and "
-        "validation through 5-fold CV | OOF evaluated rows: retained listings"
-    )
-    scope_cards = st.columns(2)
-    scope_cards[0].metric("Rows Retained", f"{int(restricted_row['Retained_OOF_Rows']):,}")
-    scope_cards[1].metric(
-        "Rows Removed", f"{int(restricted_row['Removed_Evaluation_Rows']):,}"
-    )
-    rmse_cards = st.columns(3)
-    rmse_cards[0].metric(
-        "Original RMSE", f"RM {restricted_row['Matched_Original_RMSE_RM']:,.0f}"
-    )
-    rmse_cards[1].metric(
-        "Retrained RMSE", f"RM {restricted_row['Matched_Retrained_RMSE_RM']:,.0f}"
-    )
-    rmse_cards[2].metric(
-        "RMSE Gain", f"RM {restricted_row['Matched_RMSE_Gain_RM']:,.0f}"
-    )
-    mae_cards = st.columns(3)
-    mae_cards[0].metric(
-        "Original MAE", f"RM {restricted_row['Matched_Original_MAE_RM']:,.0f}"
-    )
-    mae_cards[1].metric(
-        "Retrained MAE", f"RM {restricted_row['Matched_Retrained_MAE_RM']:,.0f}"
-    )
-    mae_cards[2].metric(
-        "MAE Gain", f"RM {restricted_row['Matched_MAE_Gain_RM']:,.0f}"
-    )
-    st.caption("A positive gain means retraining helped on the retained population.")
-
-    if selected_percent > 0:
-        st.warning(
-            "The lower restricted-market error should not be interpreted as improved "
-            "full-market performance. Training-only trimming worsens prediction when "
-            "all original listings remain in validation."
-        )
-    if selected_percent >= 5:
-        st.warning(
-            "At this trimming level, the market scope changes substantially because "
-            "many premium properties are excluded from evaluation."
-        )
-
-    full_chart = px.line(
-        production_training,
-        x="Removal_Percent",
-        y="RMSE_RM",
-        markers=True,
-        labels={"Removal_Percent": "Trim (%)", "RMSE_RM": "RMSE (RM)"},
-        title="Training-Only Trimming: Full-Market RMSE",
-    )
-    full_chart.update_traces(line_color="#2563eb", marker_size=9)
-    full_chart.update_layout(height=420, showlegend=False)
-    full_chart.update_xaxes(tickvals=levels, ticksuffix="%")
-    full_chart.update_yaxes(tickformat=",")
-    st.plotly_chart(full_chart, width="stretch")
-    st.caption(
-        "All points use the same 3,791-listing validation population; only training "
-        "rows change."
-    )
-
-    restricted_chart_data = production_restricted.melt(
-        id_vars=["Removal_Percent", "Retained_OOF_Rows"],
-        value_vars=["Matched_Original_RMSE_RM", "Matched_Retrained_RMSE_RM"],
-        var_name="Series",
-        value_name="RMSE_RM",
-    )
-    restricted_chart_data["Series"] = restricted_chart_data["Series"].map(
-        {
-            "Matched_Original_RMSE_RM": "Original model",
-            "Matched_Retrained_RMSE_RM": "Retrained model",
-        }
-    )
-    restricted_chart = px.line(
-        restricted_chart_data,
-        x="Removal_Percent",
-        y="RMSE_RM",
-        color="Series",
-        markers=True,
-        labels={"Removal_Percent": "Trim (%)", "RMSE_RM": "RMSE (RM)"},
-        title="Restricted-Market RMSE on Matched Retained Populations",
-        color_discrete_map={
-            "Original model": "#64748b",
-            "Retrained model": "#d97706",
-        },
-    )
-    restricted_chart.update_traces(marker_size=9)
-    restricted_chart.update_layout(height=420, legend_title_text="")
-    restricted_chart.update_xaxes(tickvals=levels, ticksuffix="%")
-    restricted_chart.update_yaxes(tickformat=",")
-    st.plotly_chart(restricted_chart, width="stretch")
-    st.caption(
-        "Each trim level has a different retained population. Falling errors mainly "
-        "show that excluding premium listings creates an easier market; the gap "
-        "between lines is the additional retraining benefit."
     )
 
     st.write("### Retained Data Training & Validation")
@@ -595,106 +819,70 @@ def render_outlier_trimming() -> None:
         "other four retained folds are training data."
     )
 
-    retained_trend = (
-        retained_cv.groupby("trim_level", sort=False, as_index=False)
-        .agg(retained_rows=("retained_rows", "first"))
-    )
-    retained_trend["trim_level"] = pd.Categorical(
-        retained_trend["trim_level"], categories=labels, ordered=True
-    )
-    retained_trend = retained_trend.sort_values("trim_level")
-    retained_chart = px.bar(
-        retained_trend,
-        x="trim_level",
-        y="retained_rows",
-        text_auto=",",
-        labels={"trim_level": "Trim Level", "retained_rows": "Retained Listings"},
-        title="Retained Modelling Population by Trim Level",
-    )
-    retained_chart.update_traces(marker_color="#2563eb")
-    retained_chart.update_layout(height=390, showlegend=False)
-    retained_chart.update_yaxes(rangemode="tozero", tickformat=",")
-    st.plotly_chart(retained_chart, width="stretch")
-    st.caption(
-        "Increasing the trim level progressively reduces the population available "
-        "for both training and validation."
-    )
-    st.warning(
-        "This restricted-market result measures prediction accuracy after premium "
-        "properties are excluded. It does not represent performance on the original "
-        "complete 3,791-listing market."
-    )
-
-    st.write("### Market Scope")
-    market_scope = pd.DataFrame(
-        {
-            "Trim Level": distribution["Removal_Percent"].map(trim_label),
-            "Rows Retained": distribution["After_Row_Count"].astype(int),
-            "Rows Removed": (
-                distribution["Before_Row_Count"] - distribution["After_Row_Count"]
-            ).astype(int),
-            "Retention %": (
-                100 * distribution["After_Row_Count"] / distribution["Before_Row_Count"]
-            ),
-            "Maximum Retained Price": distribution["After_Maximum_Price_RM"],
-            "Mean Price": distribution["After_Mean_Price_RM"],
-            "Price Skewness": distribution["After_Skewness"],
-        }
-    )
-    st.dataframe(
-        market_scope.style.format(
-            {
-                "Rows Retained": "{:,}",
-                "Rows Removed": "{:,}",
-                "Retention %": "{:.1f}%",
-                "Maximum Retained Price": "RM {:,.0f}",
-                "Mean Price": "RM {:,.0f}",
-                "Price Skewness": "{:.2f}",
-            }
-        ),
-        width="stretch",
-        hide_index=True,
-    )
-
-    st.write("### Premium Impact")
-    premium_impact = production_training[
+    st.write("### Statistical Validation")
+    statistical = bootstrap.loc[
+        bootstrap["Model"].eq(FINAL_MODEL_NAME),
         [
             "Removal_Percent",
-            "Top5_RMSE_RM",
-            "P99_100_RMSE_RM",
-            "Top5_Underprediction_Pct",
-        ]
-    ].rename(
-        columns={
-            "Removal_Percent": "Trim Level",
-            "Top5_RMSE_RM": "Top-5% RMSE",
-            "P99_100_RMSE_RM": "99–100% RMSE",
-            "Top5_Underprediction_Pct": "Premium Underprediction %",
-        }
+            "RMSE_Difference_RM",
+            "RMSE_CI95_Lower_RM",
+            "RMSE_CI95_Upper_RM",
+            "MAE_Difference_RM",
+            "MAE_CI95_Lower_RM",
+            "MAE_CI95_Upper_RM",
+        ],
+    ].copy()
+    statistical.insert(
+        0,
+        "Trim Level",
+        statistical["Removal_Percent"].map(trim_label),
     )
-    premium_impact["Trim Level"] = premium_impact["Trim Level"].map(trim_label)
+    statistical["Interpretation"] = np.where(
+        statistical["Removal_Percent"].eq(0.0),
+        "Baseline",
+        np.where(
+            statistical["RMSE_CI95_Lower_RM"].gt(0),
+            "Reliably worse RMSE",
+            "RMSE difference inconclusive",
+        ),
+    )
+    statistical = statistical.rename(
+        columns={
+            "RMSE_Difference_RM": "RMSE Change",
+            "RMSE_CI95_Lower_RM": "RMSE CI95 Lower",
+            "RMSE_CI95_Upper_RM": "RMSE CI95 Upper",
+            "MAE_Difference_RM": "MAE Change",
+            "MAE_CI95_Lower_RM": "MAE CI95 Lower",
+            "MAE_CI95_Upper_RM": "MAE CI95 Upper",
+        }
+    ).drop(columns="Removal_Percent")
     st.dataframe(
-        premium_impact.style.format(
+        statistical.style.format(
             {
-                "Top-5% RMSE": "RM {:,.0f}",
-                "99–100% RMSE": "RM {:,.0f}",
-                "Premium Underprediction %": "{:.1f}%",
+                "RMSE Change": "RM {:,.0f}",
+                "RMSE CI95 Lower": "RM {:,.0f}",
+                "RMSE CI95 Upper": "RM {:,.0f}",
+                "MAE Change": "RM {:,.0f}",
+                "MAE CI95 Lower": "RM {:,.0f}",
+                "MAE CI95 Upper": "RM {:,.0f}",
             }
         ),
         width="stretch",
         hide_index=True,
     )
-    st.write(
-        "Premium underprediction increases as more upper-tail examples are removed "
-        "from training."
+    st.caption(
+        "Positive changes mean trimming performed worse than the 0% baseline. "
+        "A confidence interval entirely above zero indicates reliable deterioration."
     )
 
+    st.write("### Final Outlier-Treatment Decision")
     st.success("Final Decision: 0% Trimming")
     st.write(
-        "Upper-tail trimming was not adopted. Every nonzero training-only trimming "
-        "level worsened both RMSE and MAE on the complete 3,791-listing validation "
-        "population. Premium-tail prediction also deteriorated substantially as more "
-        "high-priced training observations were removed."
+        "Valid premium observations remain in training. Aggressive training-only "
+        "trimming worsens full-market prediction, while restricted-market errors fall "
+        "partly because the evaluation market becomes easier. Only genuinely invalid "
+        "or duplicated listings are removed; existing feature engineering is preferred "
+        "over deleting legitimate premium examples."
     )
     st.info(f"Final Production Model: {FINAL_MODEL_NAME}")
 
@@ -713,11 +901,65 @@ def render_outlier_trimming() -> None:
 
 def render_live_predictor(data: pd.DataFrame) -> None:
     st.subheader("Live House Price Predictor")
-    st.info(
-        f"Model used: {FINAL_MODEL_NAME}  |  Validation: Scenario B group-safe 5-fold CV"
+    prediction_mode = st.radio(
+        "Prediction Mode",
+        ("Final Full-Market Model", "Experimental Trimmed-Market Model"),
+        index=0,
+        horizontal=True,
+        key="prediction_mode",
     )
+    experimental_mode = prediction_mode == "Experimental Trimmed-Market Model"
+    selected_trim_level: float | None = None
+    selected_trim_metadata: dict | None = None
+
+    if experimental_mode:
+        st.caption("EXPERIMENTAL — the official final model remains the production model.")
+        selected_trim_label = st.selectbox(
+            "Experimental trim level",
+            [trim_label(level) for level in EXPERIMENTAL_TRIM_LEVELS],
+            index=0,
+            key="predictor_trim_level",
+        )
+        selected_trim_level = float(selected_trim_label.removesuffix("%"))
+        selected_trim_metadata = get_trim_market_metadata(selected_trim_level)
+        scope = st.columns(6)
+        scope[0].metric("Trim Level", selected_trim_metadata["trim_label"])
+        scope[1].metric(
+            "Original Rows", f"{selected_trim_metadata['original_rows']:,}"
+        )
+        scope[2].metric("Rows Removed", f"{selected_trim_metadata['removed_rows']:,}")
+        scope[3].metric("Retained Rows", f"{selected_trim_metadata['retained_rows']:,}")
+        scope[4].metric(
+            "Retention", f"{selected_trim_metadata['retention_percentage']:.2f}%"
+        )
+        scope[5].metric(
+            "Maximum Retained Price",
+            f"RM {selected_trim_metadata['maximum_retained_price_RM']:,.0f}",
+        )
+        st.caption(
+            "Mean retained training price: "
+            f"RM {selected_trim_metadata['mean_retained_price_RM']:,.0f}."
+        )
+        st.warning(
+            "Experimental restricted-market model. It was trained after excluding "
+            f"the highest-priced {selected_trim_metadata['trim_label']} of listings. "
+            "Predictions for properties outside the retained market, especially premium "
+            "properties, may be unreliable."
+        )
+        st.info(
+            "Lower restricted-market RMSE partly occurs because the prediction scope "
+            "becomes narrower and the most difficult premium listings are excluded."
+        )
+    else:
+        st.info(
+            "Status: FINAL MODEL  |  Trim: 0%  |  Training population: 3,791 listings  |  "
+            "Validation methodology: Scenario B group-safe 5-fold CV  |  "
+            "Deployment fitting: all eligible rows after evaluation"
+        )
+
     st.write(
-        "The final model uses selected property-position phrases from the listing description."
+        f"Both modes use {FINAL_MODEL_NAME} and the same structured, target-encoding, "
+        "PPSF, and position-feature pipeline. Description inputs remain supplementary."
     )
     description = st.text_area(
         "Listing Description",
@@ -797,13 +1039,24 @@ def render_live_predictor(data: pd.DataFrame) -> None:
         has_gym = int(facilities[3].checkbox("Gym"))
         has_playground = int(facilities[4].checkbox("Playground"))
 
-        st.write("#### Property Condition")
-        condition = st.columns(2)
-        is_furnished = int(condition[0].checkbox("Furnished"))
-        is_renovated = int(condition[1].checkbox("Renovated"))
+        status_columns = st.columns(2)
+        furnishing_status = status_columns[0].selectbox(
+            "Furnishing Status",
+            list(FURNISHING_STATUS_VALUES),
+            index=0,
+        )
+        renovation_status = status_columns[1].selectbox(
+            "Renovation Status",
+            list(RENOVATION_STATUS_VALUES),
+            index=0,
+        )
         submitted = st.form_submit_button("Estimate Price", type="primary")
 
     if submitted:
+        condition_values = condition_feature_values(
+            furnishing_status,
+            renovation_status,
+        )
         values = {
             "property_size_sqft": property_size,
             "bedroom": bedrooms,
@@ -825,8 +1078,8 @@ def render_live_predictor(data: pd.DataFrame) -> None:
             "has_lift": has_lift,
             "has_gym": has_gym,
             "has_playground": has_playground,
-            "is_furnished": is_furnished,
-            "is_renovated": is_renovated,
+            "is_furnished": condition_values["is_furnished"],
+            "is_renovated": condition_values["is_renovated"],
             "property_type": property_type,
             "tenure_type": tenure_type,
             "land_title": land_title,
@@ -837,34 +1090,83 @@ def render_live_predictor(data: pd.DataFrame) -> None:
             "city": city,
         }
         try:
-            model = load_deployment_model()
-            prediction = predict_total_price(
-                model,
+            official_model = load_deployment_model()
+            official_prediction = predict_total_price(
+                official_model,
                 values,
                 description,
                 float(data["description_length"].median()),
             )
+            trimmed_model = None
+            trimmed_prediction = None
+            if experimental_mode:
+                if selected_trim_level is None:
+                    raise ValueError("Select an experimental trim level.")
+                trimmed_model = load_trimmed_deployment_model(selected_trim_level)
+                trimmed_prediction = predict_total_price(
+                    trimmed_model,
+                    values,
+                    description,
+                    trimmed_model.description_length_median_,
+                )
         except ValueError as error:
             st.error(str(error))
         else:
-            output = st.columns(2)
-            output[0].metric(
-                "Estimated Listing Price",
-                f"RM {prediction['total_price_RM']:,.0f}",
-            )
-            output[1].metric(
-                "Estimated Price per sq.ft.",
-                f"RM {prediction['ppsf_RM']:,.0f} / sqft",
-            )
-            st.success(f"Model: {FINAL_MODEL_NAME}")
+            if experimental_mode:
+                if trimmed_prediction is None or selected_trim_metadata is None:
+                    raise AssertionError("Experimental prediction was not calculated.")
+                difference = (
+                    trimmed_prediction["total_price_RM"]
+                    - official_prediction["total_price_RM"]
+                )
+                difference_percent = (
+                    100.0 * difference / official_prediction["total_price_RM"]
+                )
+                output = st.columns(3)
+                output[0].metric(
+                    "Official Full-Market Prediction",
+                    f"RM {official_prediction['total_price_RM']:,.0f}",
+                )
+                output[1].metric(
+                    f"{selected_trim_metadata['trim_label']} Trimmed-Market Prediction",
+                    f"RM {trimmed_prediction['total_price_RM']:,.0f}",
+                )
+                output[2].metric(
+                    "Difference",
+                    f"RM {difference:+,.0f}",
+                    f"{difference_percent:+.1f}%",
+                    delta_color="off",
+                )
+                st.caption(
+                    "Estimated PPSF — official: "
+                    f"RM {official_prediction['ppsf_RM']:,.0f} / sqft; "
+                    f"{selected_trim_metadata['trim_label']} trimmed: "
+                    f"RM {trimmed_prediction['ppsf_RM']:,.0f} / sqft."
+                )
+                st.success(
+                    "Comparison shown: official 0% deployment model versus the cached "
+                    f"{selected_trim_metadata['trim_label']} experimental retained-market model."
+                )
+            else:
+                output = st.columns(2)
+                output[0].metric(
+                    "Estimated Listing Price",
+                    f"RM {official_prediction['total_price_RM']:,.0f}",
+                )
+                output[1].metric(
+                    "Estimated Price per sq.ft.",
+                    f"RM {official_prediction['ppsf_RM']:,.0f} / sqft",
+                )
+                st.success(f"Model: {FINAL_MODEL_NAME}")
             if description.strip():
                 st.caption(
-                    f"Description length used: {prediction['description_length']:,.0f} characters."
+                    "Description length used: "
+                    f"{official_prediction['description_length']:,.0f} characters."
                 )
             else:
                 st.caption(
-                    "Description was blank, so the canonical training median description "
-                    f"length ({model.description_length_median_:,.0f}) was used."
+                    "Description was blank, so each model's training-population median "
+                    "description length was used."
                 )
             st.warning(
                 "This is a statistical listing-price estimate and not a certified property valuation."
@@ -878,13 +1180,15 @@ def main() -> None:
         layout="wide",
     )
     st.title("Real Estate Price Prediction Dashboard")
-    st.caption("Scenario B leakage-safe group cross-validation")
     payload = load_comparison()
     data = load_dataset()
     st.sidebar.title("Navigation")
     view = st.sidebar.radio("Select View", list(VIEWS), key="navigation")
+    if view != "Model Comparison":
+        st.caption("Scenario B leakage-safe group cross-validation")
     if view == "Model Comparison":
         render_comparison(payload)
+        render_all_models_trimming_comparison()
     elif view == "Feature Importance":
         render_feature_importance()
     elif view == "Actual vs Predicted":
