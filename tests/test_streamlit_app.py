@@ -20,7 +20,11 @@ from src.models.final.position_regex_lightgbm import (
 )
 from src.models.final.trimmed_market import fit_trimmed_market_model
 from prototype.app import (
+    COMPARISON_METRICS,
     VIEWS,
+    build_official_metric_chart,
+    build_trimmed_metric_chart,
+    comparison_frame,
     comparison_display_frame,
     condition_feature_values,
     load_all_models_trimming_summary,
@@ -29,6 +33,7 @@ from prototype.app import (
     render_outlier_trimming,
     trimming_display_frame,
 )
+from prototype.eda_page import EDA_VISUALIZATIONS, render_eda_page
 
 
 class FinalStreamlitAppTests(unittest.TestCase):
@@ -37,6 +42,7 @@ class FinalStreamlitAppTests(unittest.TestCase):
         self.assertEqual(0, len(app.exception))
         expected_views = [
             "Model Comparison",
+            "Exploratory Data Analysis",
             "Feature Importance",
             "Actual vs Predicted",
             "Outlier & Trimming Analysis",
@@ -45,9 +51,17 @@ class FinalStreamlitAppTests(unittest.TestCase):
         self.assertEqual(expected_views, list(VIEWS))
         self.assertEqual(expected_views, list(app.sidebar.radio[0].options))
         self.assertEqual("Model Comparison", app.sidebar.radio[0].value)
-        self.assertEqual(8, len(app.get("plotly_chart")))
+        self.assertEqual(2, len(app.get("plotly_chart")))
         self.assertEqual(5, len(app.dataframe))
-        self.assertEqual(0, len(app.selectbox))
+        self.assertEqual(2, len(app.selectbox))
+        self.assertEqual(
+            ["Select Evaluation Metric", "Select Trimming Metric"],
+            [item.label for item in app.selectbox],
+        )
+        self.assertEqual(["RMSE", "MAE", "R²", "Adjusted R²"], list(app.selectbox[0].options))
+        self.assertEqual(["RMSE", "MAE", "R²", "Adjusted R²"], list(app.selectbox[1].options))
+        self.assertEqual("RMSE", app.selectbox[0].value)
+        self.assertEqual("RMSE", app.selectbox[1].value)
         self.assertEqual(0, len(app.metric))
         self.assertEqual(0, len(app.info))
         self.assertEqual(0, len(app.warning))
@@ -93,23 +107,94 @@ class FinalStreamlitAppTests(unittest.TestCase):
 
         chart_specs = [json.loads(chart.proto.spec) for chart in app.get("plotly_chart")]
         self.assertEqual(
-            [
-                "RMSE by Model",
-                "MAE by Model",
-                "R² by Model",
-                "Adjusted R² by Model",
-                "RMSE Across Trimming Levels",
-                "MAE Across Trimming Levels",
-                "R² Across Trimming Levels",
-                "Adjusted R² Across Trimming Levels",
-            ],
+            ["RMSE by Model", "RMSE Across Trimming Levels"],
             [spec["layout"]["title"]["text"] for spec in chart_specs],
         )
+        self.assertEqual(4, len(chart_specs[0]["data"]))
+        self.assertEqual(4, len(chart_specs[1]["data"]))
+
+        expected_titles = {
+            "RMSE": "RMSE by Model",
+            "MAE": "MAE by Model",
+            "R²": "R² by Model",
+            "Adjusted R²": "Adjusted R² by Model",
+        }
+        for metric, title in expected_titles.items():
+            with self.subTest(official_metric=metric):
+                app.selectbox[0].set_value(metric).run(timeout=60)
+                self.assertEqual(0, len(app.exception))
+                spec = json.loads(app.get("plotly_chart")[0].proto.spec)
+                self.assertEqual(title, spec["layout"]["title"]["text"])
+                self.assertEqual(4, len(spec["data"]))
+
+        expected_trim_titles = {
+            "RMSE": "RMSE Across Trimming Levels",
+            "MAE": "MAE Across Trimming Levels",
+            "R²": "R² Across Trimming Levels",
+            "Adjusted R²": "Adjusted R² Across Trimming Levels",
+        }
+        for metric, title in expected_trim_titles.items():
+            with self.subTest(trimming_metric=metric):
+                app.selectbox[1].set_value(metric).run(timeout=60)
+                self.assertEqual(0, len(app.exception))
+                spec = json.loads(app.get("plotly_chart")[1].proto.spec)
+                self.assertEqual(title, spec["layout"]["title"]["text"])
+                self.assertEqual(4, len(spec["data"]))
+
+        app.selectbox[0].set_value("RMSE")
+        app.selectbox[1].set_value("RMSE").run(timeout=60)
+
+        app.sidebar.radio[0].set_value("Exploratory Data Analysis").run(timeout=60)
+        self.assertEqual(0, len(app.exception))
+        self.assertEqual(2, len(app.dataframe))
+        self.assertEqual(1, len(app.get("plotly_chart")))
+        self.assertEqual(["EDA Category", "Select Visualization"], [item.label for item in app.selectbox])
+        self.assertEqual(list(EDA_VISUALIZATIONS), list(app.selectbox[0].options))
+        self.assertEqual("Price & Location", app.selectbox[0].value)
+        self.assertEqual(
+            list(EDA_VISUALIZATIONS["Price & Location"]),
+            list(app.selectbox[1].options),
+        )
+        self.assertEqual(
+            "Average Property Listing Price by State",
+            json.loads(app.get("plotly_chart")[0].proto.spec)["layout"]["title"]["text"],
+        )
+        app.selectbox[1].set_value("Mean and Median Condominium Price by State").run(
+            timeout=60
+        )
+        self.assertEqual(0, len(app.exception))
+        self.assertEqual(1, len(app.get("plotly_chart")))
+        self.assertEqual(
+            "Mean and Median Condominium Price by State",
+            json.loads(app.get("plotly_chart")[0].proto.spec)["layout"]["title"]["text"],
+        )
+        app.selectbox[0].set_value("Property Characteristics").run(timeout=60)
+        self.assertEqual(0, len(app.exception))
+        self.assertEqual(
+            list(EDA_VISUALIZATIONS["Property Characteristics"]),
+            list(app.selectbox[1].options),
+        )
+        self.assertEqual(1, len(app.get("plotly_chart")))
+
+        app.sidebar.radio[0].set_value("Model Comparison").run(timeout=60)
+        self.assertEqual(0, len(app.exception))
+        self.assertEqual(2, len(app.get("plotly_chart")))
+        self.assertEqual(5, len(app.dataframe))
 
         app.sidebar.radio[0].set_value("Feature Importance").run(timeout=60)
         self.assertEqual(0, len(app.exception))
         self.assertEqual(FINAL_MODEL_NAME, app.selectbox[0].value)
         self.assertEqual(1, len(app.get("plotly_chart")))
+
+        app.sidebar.radio[0].set_value("Exploratory Data Analysis").run(timeout=60)
+        self.assertEqual(0, len(app.exception))
+        self.assertEqual(1, len(app.get("plotly_chart")))
+        self.assertEqual(2, len(app.dataframe))
+
+        app.sidebar.radio[0].set_value("Model Comparison").run(timeout=60)
+        self.assertEqual(0, len(app.exception))
+        self.assertEqual(2, len(app.get("plotly_chart")))
+        self.assertEqual(5, len(app.dataframe))
 
         app.sidebar.radio[0].set_value("Actual vs Predicted").run(timeout=60)
         self.assertEqual(0, len(app.exception))
@@ -195,9 +280,9 @@ class FinalStreamlitAppTests(unittest.TestCase):
 
         app.sidebar.radio[0].set_value("Model Comparison").run(timeout=60)
         self.assertEqual(0, len(app.exception))
-        self.assertEqual(8, len(app.get("plotly_chart")))
+        self.assertEqual(2, len(app.get("plotly_chart")))
         self.assertEqual(5, len(app.dataframe))
-        self.assertEqual(0, len(app.selectbox))
+        self.assertEqual(2, len(app.selectbox))
         self.assertEqual(0, len(app.metric))
 
         app.sidebar.radio[0].set_value("Live House Price Predictor").run(timeout=60)
@@ -267,6 +352,42 @@ class FinalStreamlitAppTests(unittest.TestCase):
         self.assertIn("5% Trimmed-Market Prediction", experimental_metrics)
         self.assertIn("Difference", experimental_metrics)
 
+    def test_metric_chart_builders_use_saved_values(self):
+        payload = json.loads(
+            (PROJECT_ROOT / "results" / "final_models" / "model_comparison.json")
+            .read_text(encoding="utf-8")
+        )
+        official = comparison_frame(payload).set_index("Model")
+        trimmed = load_all_models_trimming_summary()
+        for metric_name, (column, title_metric, _, _) in COMPARISON_METRICS.items():
+            with self.subTest(metric=metric_name):
+                official_figure = build_official_metric_chart(
+                    official.reset_index(), metric_name
+                )
+                self.assertEqual(
+                    f"{title_metric} by Model", official_figure.layout.title.text
+                )
+                self.assertEqual(620, official_figure.layout.height)
+                self.assertEqual(4, len(official_figure.data))
+                for trace in official_figure.data:
+                    self.assertAlmostEqual(
+                        float(official.loc[trace.name, column]), float(trace.y[0])
+                    )
+
+                trimmed_figure = build_trimmed_metric_chart(trimmed, metric_name)
+                self.assertEqual(
+                    f"{title_metric} Across Trimming Levels",
+                    trimmed_figure.layout.title.text,
+                )
+                self.assertEqual(650, trimmed_figure.layout.height)
+                self.assertEqual(4, len(trimmed_figure.data))
+                for trace in trimmed_figure.data:
+                    expected = trimmed.loc[trimmed["Model"].eq(trace.name), column]
+                    np.testing.assert_allclose(
+                        np.asarray(trace.y, dtype=float), expected.to_numpy(float)
+                    )
+                    self.assertEqual(6, len(trace.x))
+
     def test_all_furnishing_and_renovation_combinations_predict(self):
         data = pd.read_csv(
             PROJECT_ROOT / "data" / "processed" / "enhanced_city_dataset.csv"
@@ -308,7 +429,8 @@ class FinalStreamlitAppTests(unittest.TestCase):
         self.assertIn("load_trimming_results", trimming_renderer)
         summary_renderer = inspect.getsource(render_all_models_trimming_comparison)
         self.assertNotIn("fit_", summary_renderer)
-        self.assertNotIn("selectbox", summary_renderer)
+        self.assertIn("selectbox", summary_renderer)
+        self.assertIn("trimmed_comparison_metric", summary_renderer)
         self.assertNotIn("st.metric", summary_renderer)
         self.assertIn("plotly_chart", summary_renderer)
         self.assertIn("load_all_models_trimming_summary", summary_renderer)

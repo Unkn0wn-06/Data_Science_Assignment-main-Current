@@ -32,6 +32,7 @@ from src.models.final.trimmed_market import (
     fit_trimmed_market_model,
     get_trim_market_metadata,
 )
+from prototype.eda_page import render_eda_page
 
 
 DATA_PATH = PROJECT_ROOT / "data" / "processed" / "enhanced_city_dataset.csv"
@@ -46,6 +47,7 @@ ALL_MODELS_TRIMMING_PATH = (
 )
 VIEWS = (
     "Model Comparison",
+    "Exploratory Data Analysis",
     "Feature Importance",
     "Actual vs Predicted",
     "Outlier & Trimming Analysis",
@@ -53,6 +55,18 @@ VIEWS = (
 )
 FURNISHING_STATUS_VALUES = {"Unfurnished": 0, "Furnished": 1}
 RENOVATION_STATUS_VALUES = {"Not Renovated": 0, "Renovated": 1}
+MODEL_COLORS = {
+    "Ridge Regression": "#2563eb",
+    "Random Forest": "#d97706",
+    "Gradient Boosting": "#db2777",
+    FINAL_MODEL_NAME: "#4d7c0f",
+}
+COMPARISON_METRICS = {
+    "RMSE": ("RMSE_RM", "RMSE", "RMSE (RM)", ",.0f"),
+    "MAE": ("MAE_RM", "MAE", "MAE (RM)", ",.0f"),
+    "R²": ("R2", "R²", "R²", ".4f"),
+    "Adjusted R²": ("Adjusted_R2", "Adjusted R²", "Adjusted R²", ".4f"),
+}
 
 
 @st.cache_data
@@ -256,40 +270,37 @@ def condition_feature_values(
     }
 
 
+def build_official_metric_chart(table: pd.DataFrame, metric_name: str) -> go.Figure:
+    """Build one full-width official comparison chart from saved metrics."""
+    metric, title_metric, y_label, text_format = COMPARISON_METRICS[metric_name]
+    figure = px.bar(
+        table,
+        x="Model",
+        y=metric,
+        text_auto=text_format,
+        color="Model",
+        color_discrete_map=MODEL_COLORS,
+        category_orders={"Model": list(FINAL_MODELS)},
+        labels={metric: y_label},
+        title=f"{title_metric} by Model",
+    )
+    figure.update_layout(showlegend=False, height=620)
+    figure.update_yaxes(rangemode="tozero", tickformat=text_format)
+    return figure
+
+
 def render_comparison(payload: dict) -> None:
     st.subheader("Final Four-Model Comparison")
     table = comparison_frame(payload)
-    model_colors = {
-        "Ridge Regression": "#2563eb",
-        "Random Forest": "#d97706",
-        "Gradient Boosting": "#db2777",
-        FINAL_MODEL_NAME: "#4d7c0f",
-    }
-    chart_specs = (
-        ("RMSE_RM", "RMSE by Model", ",.0f", "RMSE (RM)"),
-        ("MAE_RM", "MAE by Model", ",.0f", "MAE (RM)"),
-        ("R2", "R² by Model", ".4f", "R²"),
-        ("Adjusted_R2", "Adjusted R² by Model", ".4f", "Adjusted R²"),
+    selected_metric = st.selectbox(
+        "Select Evaluation Metric",
+        list(COMPARISON_METRICS),
+        key="model_comparison_metric",
     )
-    for row_start in (0, 2):
-        columns = st.columns(2)
-        for column, (metric, title, text_format, y_label) in zip(
-            columns, chart_specs[row_start : row_start + 2]
-        ):
-            figure = px.bar(
-                table,
-                x="Model",
-                y=metric,
-                text_auto=text_format,
-                color="Model",
-                color_discrete_map=model_colors,
-                category_orders={"Model": list(FINAL_MODELS)},
-                labels={metric: y_label},
-                title=title,
-            )
-            figure.update_layout(showlegend=False, height=390)
-            figure.update_yaxes(rangemode="tozero", tickformat=text_format)
-            column.plotly_chart(figure, width="stretch")
+    st.plotly_chart(
+        build_official_metric_chart(table, selected_metric),
+        width="stretch",
+    )
 
     st.subheader("Detailed Comparison Table")
     display = comparison_display_frame(payload)
@@ -437,44 +448,15 @@ def render_all_models_trimming_comparison() -> None:
     """Render all four models using the validated saved 24-row artifact only."""
     st.subheader("Trimmed-Data Model Comparison")
     summary = load_all_models_trimming_summary()
-    model_colors = {
-        "Ridge Regression": "#2563eb",
-        "Random Forest": "#d97706",
-        "Gradient Boosting": "#db2777",
-        FINAL_MODEL_NAME: "#4d7c0f",
-    }
-    chart_specs = (
-        ("RMSE_RM", "RMSE Across Trimming Levels", "RMSE (RM)"),
-        ("MAE_RM", "MAE Across Trimming Levels", "MAE (RM)"),
-        ("R2", "R² Across Trimming Levels", "R²"),
-        ("Adjusted_R2", "Adjusted R² Across Trimming Levels", "Adjusted R²"),
+    selected_metric = st.selectbox(
+        "Select Trimming Metric",
+        list(COMPARISON_METRICS),
+        key="trimmed_comparison_metric",
     )
-    trim_order = ["0%", "0.5%", "1%", "2.5%", "5%", "10%"]
-    for row_start in (0, 2):
-        columns = st.columns(2)
-        for column, (metric, title, y_label) in zip(
-            columns, chart_specs[row_start : row_start + 2]
-        ):
-            figure = px.line(
-                summary,
-                x="Trim_Level",
-                y=metric,
-                color="Model",
-                line_dash="Model",
-                markers=True,
-                category_orders={
-                    "Trim_Level": trim_order,
-                    "Model": list(FINAL_MODELS),
-                },
-                color_discrete_map=model_colors,
-                labels={"Trim_Level": "Trim Level", metric: y_label},
-                title=title,
-            )
-            figure.update_layout(height=410, legend_title_text="")
-            figure.update_yaxes(
-                tickformat=",.0f" if metric in {"RMSE_RM", "MAE_RM"} else ".4f"
-            )
-            column.plotly_chart(figure, width="stretch")
+    st.plotly_chart(
+        build_trimmed_metric_chart(summary, selected_metric),
+        width="stretch",
+    )
 
     for model_name in FINAL_MODELS:
         st.subheader(model_name)
@@ -492,6 +474,30 @@ def render_all_models_trimming_comparison() -> None:
             width="stretch",
             hide_index=True,
         )
+
+
+def build_trimmed_metric_chart(summary: pd.DataFrame, metric_name: str) -> go.Figure:
+    """Build one full-width four-model trimming chart from saved metrics."""
+    metric, title_metric, y_label, text_format = COMPARISON_METRICS[metric_name]
+    trim_order = ["0%", "0.5%", "1%", "2.5%", "5%", "10%"]
+    figure = px.line(
+        summary,
+        x="Trim_Level",
+        y=metric,
+        color="Model",
+        line_dash="Model",
+        markers=True,
+        category_orders={
+            "Trim_Level": trim_order,
+            "Model": list(FINAL_MODELS),
+        },
+        color_discrete_map=MODEL_COLORS,
+        labels={"Trim_Level": "Trim Level", metric: y_label},
+        title=f"{title_metric} Across Trimming Levels",
+    )
+    figure.update_layout(height=650, legend_title_text="")
+    figure.update_yaxes(tickformat=text_format)
+    return figure
 
 
 def render_outlier_trimming() -> None:
@@ -1184,11 +1190,13 @@ def main() -> None:
     data = load_dataset()
     st.sidebar.title("Navigation")
     view = st.sidebar.radio("Select View", list(VIEWS), key="navigation")
-    if view != "Model Comparison":
+    if view not in {"Model Comparison", "Exploratory Data Analysis"}:
         st.caption("Scenario B leakage-safe group cross-validation")
     if view == "Model Comparison":
         render_comparison(payload)
         render_all_models_trimming_comparison()
+    elif view == "Exploratory Data Analysis":
+        render_eda_page()
     elif view == "Feature Importance":
         render_feature_importance()
     elif view == "Actual vs Predicted":
