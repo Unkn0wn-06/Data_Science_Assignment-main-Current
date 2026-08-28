@@ -147,7 +147,8 @@ class FinalStreamlitAppTests(unittest.TestCase):
         app.sidebar.radio[0].set_value("Exploratory Data Analysis").run(timeout=60)
         self.assertEqual(0, len(app.exception))
         self.assertEqual(2, len(app.dataframe))
-        self.assertEqual(1, len(app.get("plotly_chart")))
+        self.assertEqual(0, len(app.get("plotly_chart")))
+        self.assertEqual(1, len(app.get("imgs")))
         self.assertEqual(["EDA Category", "Select Visualization"], [item.label for item in app.selectbox])
         self.assertEqual(list(EDA_VISUALIZATIONS), list(app.selectbox[0].options))
         self.assertEqual("Price & Location", app.selectbox[0].value)
@@ -155,31 +156,36 @@ class FinalStreamlitAppTests(unittest.TestCase):
             list(EDA_VISUALIZATIONS["Price & Location"]),
             list(app.selectbox[1].options),
         )
-        self.assertEqual(
-            "Average Property Listing Price by State",
-            json.loads(app.get("plotly_chart")[0].proto.spec)["layout"]["title"]["text"],
-        )
         app.selectbox[1].set_value("Mean and Median Condominium Price by State").run(
             timeout=60
         )
         self.assertEqual(0, len(app.exception))
-        self.assertEqual(1, len(app.get("plotly_chart")))
-        self.assertEqual(
-            "Mean and Median Condominium Price by State",
-            json.loads(app.get("plotly_chart")[0].proto.spec)["layout"]["title"]["text"],
-        )
+        self.assertEqual(0, len(app.get("plotly_chart")))
+        self.assertEqual(1, len(app.get("imgs")))
         app.selectbox[0].set_value("Property Characteristics").run(timeout=60)
         self.assertEqual(0, len(app.exception))
         self.assertEqual(
             list(EDA_VISUALIZATIONS["Property Characteristics"]),
             list(app.selectbox[1].options),
         )
-        self.assertEqual(1, len(app.get("plotly_chart")))
+        self.assertEqual(0, len(app.get("plotly_chart")))
+        self.assertEqual(1, len(app.get("imgs")))
+        app.selectbox[1].set_value("Listing Price Distribution by Land Title").run(
+            timeout=60
+        )
+        self.assertEqual(0, len(app.exception))
+        self.assertEqual(1, len(app.get("imgs")))
 
         app.sidebar.radio[0].set_value("Model Comparison").run(timeout=60)
         self.assertEqual(0, len(app.exception))
         self.assertEqual(2, len(app.get("plotly_chart")))
         self.assertEqual(5, len(app.dataframe))
+
+        app.sidebar.radio[0].set_value("Exploratory Data Analysis").run(timeout=60)
+        self.assertEqual(0, len(app.exception))
+        self.assertEqual(0, len(app.get("plotly_chart")))
+        self.assertEqual(1, len(app.get("imgs")))
+        self.assertEqual(2, len(app.selectbox))
 
         app.sidebar.radio[0].set_value("Feature Importance").run(timeout=60)
         self.assertEqual(0, len(app.exception))
@@ -188,8 +194,19 @@ class FinalStreamlitAppTests(unittest.TestCase):
 
         app.sidebar.radio[0].set_value("Exploratory Data Analysis").run(timeout=60)
         self.assertEqual(0, len(app.exception))
-        self.assertEqual(1, len(app.get("plotly_chart")))
+        self.assertEqual(0, len(app.get("plotly_chart")))
+        self.assertEqual(1, len(app.get("imgs")))
         self.assertEqual(2, len(app.dataframe))
+
+        app.sidebar.radio[0].set_value("Outlier & Trimming Analysis").run(timeout=60)
+        self.assertEqual(0, len(app.exception))
+        self.assertEqual(4, len(app.get("plotly_chart")))
+
+        app.sidebar.radio[0].set_value("Exploratory Data Analysis").run(timeout=60)
+        self.assertEqual(0, len(app.exception))
+        self.assertEqual(0, len(app.get("plotly_chart")))
+        self.assertEqual(1, len(app.get("imgs")))
+        self.assertEqual(2, len(app.selectbox))
 
         app.sidebar.radio[0].set_value("Model Comparison").run(timeout=60)
         self.assertEqual(0, len(app.exception))
