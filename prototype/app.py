@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import sys
 from pathlib import Path
@@ -19,16 +20,22 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.models.common.features import MODEL_FEATURES
 from src.models.final.final_evaluation import FINAL_MODELS, PREDICTION_COLUMNS
+from src.models.final.model_builders import (
+    build_position_lightgbm,
+    build_standard_ppsf_estimator,
+)
 from src.models.final.position_regex_lightgbm import (
     FINAL_MODEL_NAME,
     POSITION_DISPLAY_NAMES,
     POSITION_FEATURES,
     extract_position_features,
     fit_final_model,
+    prepare_live_features,
     predict_total_price,
 )
 from src.models.final.trimmed_market import (
-    EXPERIMENTAL_TRIM_LEVELS,
+    SUPPORTED_TRIM_LEVELS,
+    fit_market_scope_models,
     fit_trimmed_market_model,
     get_trim_market_metadata,
 )
@@ -45,6 +52,16 @@ TRIMMING_METADATA_PATH = TRIMMING_RESULTS_DIR / "metadata.json"
 ALL_MODELS_TRIMMING_PATH = (
     TRIMMING_RESULTS_DIR / "all_models_trimmed_market_summary.csv"
 )
+TUNING_RESULTS_PATH = PROJECT_ROOT / "configs" / "tuning_candidates.json"
+TUNING_RUNNER_PATH = (
+    PROJECT_ROOT / "archive" / "legacy_scripts" / "model_tuning" / "src__models__tuning.py"
+)
+TUNING_SEARCH_PATHS = {
+    "Ridge Regression": PROJECT_ROOT / "archive" / "legacy_scripts" / "model_tuning" / "src__models__ridge__tuning.py",
+    "Random Forest": PROJECT_ROOT / "archive" / "legacy_scripts" / "model_tuning" / "src__models__random_forest__tuning.py",
+    "Gradient Boosting": PROJECT_ROOT / "archive" / "legacy_scripts" / "model_tuning" / "src__models__gradient_boosting__tuning.py",
+}
+MARKET_SCOPE_OPTIONS = tuple(f"{level:g}%" for level in SUPPORTED_TRIM_LEVELS)
 VIEWS = (
     "Model Comparison",
     "Exploratory Data Analysis",
@@ -66,6 +83,37 @@ COMPARISON_METRICS = {
     "MAE": ("MAE_RM", "MAE", "MAE (RM)", ",.0f"),
     "R²": ("R2", "R²", "R²", ".4f"),
     "Adjusted R²": ("Adjusted_R2", "Adjusted R²", "Adjusted R²", ".4f"),
+}
+
+# ASCII source escapes keep the labels stable on Windows checkouts regardless
+# of the active console code page.
+COMPARISON_METRICS = {
+    "RMSE": ("RMSE_RM", "RMSE", "RMSE (RM)", ",.0f"),
+    "MAE": ("MAE_RM", "MAE", "MAE (RM)", ",.0f"),
+    "R\u00b2": ("R2", "R\u00b2", "R\u00b2", ".4f"),
+    "Adjusted R\u00b2": (
+        "Adjusted_R2",
+        "Adjusted R\u00b2",
+        "Adjusted R\u00b2",
+        ".4f",
+    ),
+}
+
+# Re-declare with presentation-safe Unicode labels; the historical file passed
+# through a legacy Windows encoding and its two R-squared labels were damaged.
+COMPARISON_METRICS = {
+    "RMSE": ("RMSE_RM", "RMSE", "RMSE (RM)", ",.0f"),
+    "MAE": ("MAE_RM", "MAE", "MAE (RM)", ",.0f"),
+    "R²": ("R2", "R²", "R²", ".4f"),
+    "Adjusted R²": ("Adjusted_R2", "Adjusted R²", "Adjusted R²", ".4f"),
+}
+
+# This final assignment intentionally follows the legacy declarations above.
+COMPARISON_METRICS = {
+    "RMSE": ("RMSE_RM", "RMSE", "RMSE (RM)", ",.0f"),
+    "MAE": ("MAE_RM", "MAE", "MAE (RM)", ",.0f"),
+    "R\u00b2": ("R2", "R\u00b2", "R\u00b2", ".4f"),
+    "Adjusted R\u00b2": ("Adjusted_R2", "Adjusted R\u00b2", "Adjusted R\u00b2", ".4f"),
 }
 
 
@@ -225,6 +273,252 @@ def load_trimmed_deployment_model(trim_level: float):
     return model
 
 
+@st.cache_resource
+def load_scope_models(scope: str) -> dict[str, object]:
+    """Fit and cache the four deployment families for one saved scope."""
+    if scope not in MARKET_SCOPE_OPTIONS:
+        raise ValueError(f"Market scope must be one of: {', '.join(MARKET_SCOPE_OPTIONS)}.")
+    models = fit_market_scope_models(float(scope.removesuffix("%")))
+    if tuple(models) != FINAL_MODELS:
+        raise AssertionError("Scope model loader did not return the four final families.")
+    return models
+
+
+def scope_comparison_frame(summary: pd.DataFrame, scope: str) -> pd.DataFrame:
+    """Return the four saved Scenario B metric rows for one selected scope."""
+    if scope not in MARKET_SCOPE_OPTIONS:
+        raise ValueError(f"Unknown market scope: {scope}")
+    rows = summary.loc[summary["Trim_Level"].eq(scope)].copy()
+    if len(rows) != len(FINAL_MODELS) or set(rows["Model"]) != set(FINAL_MODELS):
+        raise ValueError(f"Saved validation results are incomplete for {scope} scope.")
+    return rows.set_index("Model").loc[list(FINAL_MODELS)].reset_index()
+
+
+def recommended_model_for_scope(summary: pd.DataFrame, scope: str) -> str:
+    """Select the saved lowest-RMSE model for the current scope."""
+    rows = scope_comparison_frame(summary, scope)
+    ranked = rows.sort_values(
+        ["RMSE_RM", "MAE_RM", "R2", "Adjusted_R2"],
+        ascending=[True, True, False, False],
+        kind="stable",
+    )
+    return str(ranked.iloc[0]["Model"])
+
+
+def scope_display_frame(summary: pd.DataFrame, scope: str) -> pd.DataFrame:
+    rows = scope_comparison_frame(summary, scope)
+    return rows.rename(
+        columns={
+            "RMSE_RM": "RMSE",
+            "MAE_RM": "MAE",
+            "R2": "R²",
+            "Adjusted_R2": "Adjusted R²",
+        }
+    ).loc[:, ["Model", "RMSE", "MAE", "R²", "Adjusted R²"]]
+
+
+def normalized_scope_display_frame(summary: pd.DataFrame, scope: str) -> pd.DataFrame:
+    """Presentation-safe metric table with stable R-squared labels."""
+    rows = scope_comparison_frame(summary, scope)
+    r2_label = "R\u00b2"
+    adjusted_label = "Adjusted R\u00b2"
+    return rows.rename(
+        columns={
+            "RMSE_RM": "RMSE",
+            "MAE_RM": "MAE",
+            "R2": r2_label,
+            "Adjusted_R2": adjusted_label,
+        }
+    ).loc[:, ["Model", "RMSE", "MAE", r2_label, adjusted_label]]
+
+
+def predict_scope_model(
+    model_name: str,
+    model: object,
+    values: dict,
+    description: str,
+    description_length_fallback: float,
+) -> dict[str, float | dict[str, bool]]:
+    """Generate a common total-price response for any final model family."""
+    if model_name == FINAL_MODEL_NAME:
+        return predict_total_price(
+            model,
+            values,
+            description,
+            description_length_fallback,
+        )
+    structured, _, detected = prepare_live_features(
+        values,
+        description,
+        description_length_fallback,
+    )
+    total_price = float(model.predict(structured)[0])
+    size = float(structured.iloc[0]["property_size_sqft"])
+    if not np.isfinite(total_price) or total_price <= 0:
+        raise ValueError(f"{model_name} returned a non-positive or non-finite estimate.")
+    return {
+        "total_price_RM": total_price,
+        "ppsf_RM": total_price / size,
+        "detected_position_features": detected,
+        "description_length": float(structured.iloc[0]["description_length"]),
+    }
+
+
+def prediction_comparison_frame(
+    selected_predictions: dict[str, dict],
+    full_market_predictions: dict[str, dict],
+) -> pd.DataFrame:
+    """Build the required four-model selected/full-market prediction table."""
+    rows = []
+    for model_name in FINAL_MODELS:
+        selected = float(selected_predictions[model_name]["total_price_RM"])
+        full = float(full_market_predictions[model_name]["total_price_RM"])
+        difference = selected - full
+        rows.append(
+            {
+                "Model": model_name,
+                "Selected-Scope Prediction": selected,
+                "Full-Market Prediction": full,
+                "Difference (RM)": difference,
+                "Difference (%)": 100.0 * difference / full,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _literal_assignment(path: Path, variable: str):
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == variable
+            for target in node.targets
+        ):
+            return ast.literal_eval(node.value)
+    raise ValueError(f"{path} does not define {variable} as a literal value.")
+
+
+def _display_value(value) -> str:
+    if isinstance(value, (list, tuple)):
+        return ", ".join("None" if item is None else str(item) for item in value)
+    if value is None:
+        return "None"
+    return str(value)
+
+
+def _final_model_parameters(model_name: str) -> dict[str, object]:
+    """Read presentation parameters from the authoritative frozen builders."""
+    parameter_names = {
+        "Ridge Regression": ("alpha",),
+        "Random Forest": (
+            "n_estimators",
+            "max_depth",
+            "min_samples_split",
+            "min_samples_leaf",
+            "max_features",
+            "criterion",
+            "bootstrap",
+            "random_state",
+            "n_jobs",
+        ),
+        "Gradient Boosting": (
+            "n_estimators",
+            "learning_rate",
+            "max_depth",
+            "random_state",
+        ),
+        FINAL_MODEL_NAME: (
+            "n_estimators",
+            "learning_rate",
+            "num_leaves",
+            "max_depth",
+            "min_child_samples",
+            "subsample",
+            "subsample_freq",
+            "colsample_bytree",
+            "reg_alpha",
+            "reg_lambda",
+            "objective",
+            "random_state",
+            "n_jobs",
+        ),
+    }
+    if model_name == FINAL_MODEL_NAME:
+        estimator = build_position_lightgbm()[0].named_steps["model"]
+    else:
+        estimator = build_standard_ppsf_estimator(model_name).regressor.named_steps["model"]
+    all_parameters = estimator.get_params(deep=False)
+    return {name: all_parameters[name] for name in parameter_names[model_name]}
+
+
+@st.cache_data
+def load_tuning_details() -> dict[str, dict]:
+    """Load only genuine historical search evidence and current frozen settings."""
+    historical = json.loads(TUNING_RESULTS_PATH.read_text(encoding="utf-8"))
+    if historical.get("search") != "RandomizedSearchCV" or historical.get("cv") != 5:
+        raise ValueError("Historical tuning artifact has an unexpected method or fold count.")
+    if "KFold(n_splits=5, shuffle=True, random_state=42)" not in TUNING_RUNNER_PATH.read_text(
+        encoding="utf-8"
+    ):
+        raise ValueError("Historical tuning runner no longer documents its validation split.")
+
+    details: dict[str, dict] = {}
+    for model_name in FINAL_MODELS:
+        final_parameters = _final_model_parameters(model_name)
+        search_space = (
+            _literal_assignment(TUNING_SEARCH_PATHS[model_name], "SEARCH_SPACE")
+            if model_name in TUNING_SEARCH_PATHS
+            else {}
+        )
+        historical_selected = historical.get("parameters", {}).get(model_name, {})
+        search_rows = []
+        for parameter, values in search_space.items():
+            search_rows.append(
+                {
+                    "Hyperparameter": parameter,
+                    "Values Tested": _display_value(values),
+                    "Selected Value": _display_value(historical_selected.get(parameter, "Not recorded")),
+                }
+            )
+        searched_model_names = {
+            parameter.removeprefix("model__")
+            for parameter in search_space
+            if parameter.startswith("model__")
+        }
+        final_rows = [
+            {
+                "Hyperparameter": parameter,
+                "Final Value": _display_value(value),
+                "Status": (
+                    "Previously searched; current frozen value"
+                    if parameter in searched_model_names
+                    else "Fixed model parameter"
+                ),
+            }
+            for parameter, value in final_parameters.items()
+        ]
+        details[model_name] = {
+            "search_space": pd.DataFrame(
+                search_rows,
+                columns=["Hyperparameter", "Values Tested", "Selected Value"],
+            ),
+            "final_parameters": pd.DataFrame(final_rows),
+            "method": (
+                f"Historical {historical['search']} with "
+                f"{historical['iterations'].get(model_name, 'unrecorded')} sampled candidates."
+                if model_name in TUNING_SEARCH_PATHS
+                else "No formal LightGBM search-space or tuning-run artifact is saved; the displayed configuration is fixed in the final builder."
+            ),
+            "validation": (
+                "Historical tuning used a shuffled 5-fold KFold on the 80% portion of a "
+                "seed-42 train/test split. It predates Scenario B and was not group-safe. "
+                "The final scope metrics above use the later Scenario B group-safe 5-fold evaluation."
+                if model_name in TUNING_SEARCH_PATHS
+                else "No separate LightGBM tuning validation is recorded. Final model validation uses the saved Scenario B group-safe 5-fold framework."
+            ),
+        }
+    return details
+
+
 def comparison_frame(payload: dict) -> pd.DataFrame:
     frame = pd.DataFrame(payload["models"]).loc[
         :, [
@@ -317,6 +611,155 @@ def render_comparison(payload: dict) -> None:
         .highlight_max(subset=["R²", "Adjusted R²"], color="#d1fae5")
     )
     st.dataframe(styled, width="stretch", hide_index=True)
+
+
+def render_scope_comparison() -> None:
+    """Render one scope-selected four-model chart, table, and tuning panel."""
+    st.subheader("Model Comparison")
+    summary = load_all_models_trimming_summary()
+    selected_scope = st.selectbox(
+        "Select Market Scope",
+        list(MARKET_SCOPE_OPTIONS),
+        index=5,
+        key="comparison_market_scope",
+    )
+    selected_metric = st.selectbox(
+        "Select Evaluation Metric",
+        list(COMPARISON_METRICS),
+        key="model_comparison_metric",
+    )
+    table = scope_comparison_frame(summary, selected_scope)
+    st.plotly_chart(
+        build_official_metric_chart(table, selected_metric),
+        width="stretch",
+    )
+
+    st.subheader("Final Model Performance")
+    display = scope_display_frame(summary, selected_scope)
+    styled = (
+        display.style.format(
+            {
+                "RMSE": "RM {:,.0f}",
+                "MAE": "RM {:,.0f}",
+                "R²": "{:.4f}",
+                "Adjusted R²": "{:.4f}",
+            }
+        )
+        .highlight_min(subset=["RMSE", "MAE"], color="#d1fae5")
+        .highlight_max(subset=["R²", "Adjusted R²"], color="#d1fae5")
+    )
+    st.dataframe(styled, width="stretch", hide_index=True)
+    recommended = recommended_model_for_scope(summary, selected_scope)
+    st.caption(
+        f"Recommended for {selected_scope} scope: {recommended} "
+        "(lowest saved validation RMSE; MAE, R², and adjusted R² support tie-breaking)."
+    )
+
+    st.divider()
+    st.subheader("Hyperparameter Tuning")
+    selected_model = st.selectbox(
+        "Select Model for Hyperparameter Details",
+        list(FINAL_MODELS),
+        index=list(FINAL_MODELS).index(FINAL_MODEL_NAME),
+        key="tuning_model",
+    )
+    tuning = load_tuning_details()[selected_model]
+    st.write("#### Hyperparameter Search Space")
+    if tuning["search_space"].empty:
+        st.info(
+            "No formal search-space artifact is saved for this model. "
+            "The fixed final configuration is shown below without claiming a tuning search."
+        )
+    else:
+        st.dataframe(tuning["search_space"], width="stretch", hide_index=True)
+        st.caption(
+            "The selected values in this table come from the historical randomized-search "
+            "artifact; the deployed values are the current final-builder settings below."
+        )
+    st.write("#### Selected / Final Hyperparameters")
+    st.dataframe(tuning["final_parameters"], width="stretch", hide_index=True)
+    st.write("#### Tuning Method")
+    st.write(tuning["method"])
+    st.write("#### Validation Method")
+    st.write(tuning["validation"])
+    st.caption(
+        "No before-versus-after table is shown because the repository does not contain "
+        "comparable baseline and tuned metrics from the same population and validation split."
+    )
+
+
+def render_scope_comparison_v2() -> None:
+    """Encoding-stable implementation of the scope comparison page."""
+    st.subheader("Model Comparison")
+    summary = load_all_models_trimming_summary()
+    selected_scope = st.selectbox(
+        "Select Market Scope",
+        list(MARKET_SCOPE_OPTIONS),
+        index=5,
+        key="comparison_market_scope",
+    )
+    selected_metric = st.selectbox(
+        "Select Evaluation Metric",
+        list(COMPARISON_METRICS),
+        key="model_comparison_metric",
+    )
+    table = scope_comparison_frame(summary, selected_scope)
+    st.plotly_chart(build_official_metric_chart(table, selected_metric), width="stretch")
+
+    st.subheader("Final Model Performance")
+    display = normalized_scope_display_frame(summary, selected_scope)
+    r2_label = "R\u00b2"
+    adjusted_label = "Adjusted R\u00b2"
+    styled = (
+        display.style.format(
+            {
+                "RMSE": "RM {:,.0f}",
+                "MAE": "RM {:,.0f}",
+                r2_label: "{:.4f}",
+                adjusted_label: "{:.4f}",
+            }
+        )
+        .highlight_min(subset=["RMSE", "MAE"], color="#d1fae5")
+        .highlight_max(subset=[r2_label, adjusted_label], color="#d1fae5")
+    )
+    st.dataframe(styled, width="stretch", hide_index=True)
+    recommended = recommended_model_for_scope(summary, selected_scope)
+    st.caption(
+        f"Recommended for {selected_scope} scope: {recommended} "
+        "(lowest saved validation RMSE; MAE and R-squared metrics support tie-breaking)."
+    )
+
+    st.divider()
+    st.subheader("Hyperparameter Tuning")
+    selected_model = st.selectbox(
+        "Select Model for Hyperparameter Details",
+        list(FINAL_MODELS),
+        index=list(FINAL_MODELS).index(FINAL_MODEL_NAME),
+        key="tuning_model",
+    )
+    tuning = load_tuning_details()[selected_model]
+    st.write("#### Hyperparameter Search Space")
+    if tuning["search_space"].empty:
+        st.info(
+            "No formal search-space artifact is saved for this model. "
+            "The fixed final configuration is shown below without claiming a tuning search."
+        )
+    else:
+        st.dataframe(tuning["search_space"], width="stretch", hide_index=True)
+        st.caption(
+            "Selected values here come from the historical randomized-search artifact; "
+            "deployed values are the current final-builder settings below."
+        )
+    st.write("#### Selected / Final Hyperparameters")
+    st.dataframe(tuning["final_parameters"], width="stretch", hide_index=True)
+    st.write("#### Tuning Method")
+    st.write(tuning["method"])
+    st.write("#### Validation Method")
+    st.write(tuning["validation"])
+    st.caption(
+        "No before-versus-after table is shown because no comparable baseline and tuned "
+        "metrics exist for the same population and validation split."
+    )
 
 
 def render_feature_importance() -> None:
@@ -1179,6 +1622,219 @@ def render_live_predictor(data: pd.DataFrame) -> None:
             )
 
 
+def render_scope_predictor(data: pd.DataFrame) -> None:
+    """Render four-model live inference for a selected saved market scope."""
+    st.subheader("Live House Price Predictor")
+    selected_scope = st.selectbox(
+        "Select Market Scope",
+        list(MARKET_SCOPE_OPTIONS),
+        index=5,
+        key="predictor_market_scope",
+    )
+    scope_level = float(selected_scope.removesuffix("%"))
+    metadata = get_trim_market_metadata(scope_level)
+    scope_metrics = st.columns(4)
+    scope_metrics[0].metric("Model Scope", selected_scope)
+    scope_metrics[1].metric("Training Listings", f"{metadata['retained_rows']:,}")
+    scope_metrics[2].metric("Listings Excluded", f"{metadata['removed_rows']:,}")
+    scope_metrics[3].metric("Retention", f"{metadata['retention_percentage']:.2f}%")
+    st.caption(
+        "The percentage selects an already-validated training population; it is never "
+        "calculated from the live property. Full-market (0%) results remain alongside it."
+    )
+    if scope_level > 0:
+        st.warning(
+            f"{selected_scope} scope excludes the saved upper price tail from model training. "
+            "Predictions for premium properties outside that retained market may be less reliable."
+        )
+
+    description = st.text_area(
+        "Listing Description",
+        placeholder="Example: Spacious high floor unit with a large balcony and city views.",
+        key="listing_description",
+    )
+    detected = extract_position_features([description]).iloc[0]
+    st.write("#### Detected position features")
+    status_columns = st.columns(5)
+    for column, feature in zip(status_columns, POSITION_FEATURES):
+        mark = "✓" if bool(detected[feature]) else "—"
+        column.caption(f"{mark} {POSITION_DISPLAY_NAMES[feature]}")
+
+    with st.form("scope_prediction_form"):
+        numeric, category = st.columns(2)
+        with numeric:
+            property_size = st.number_input(
+                "Property Size (sq.ft.)",
+                min_value=1.0,
+                max_value=20_000.0,
+                value=float(data["property_size_sqft"].median()),
+                step=50.0,
+            )
+            bedrooms = st.number_input(
+                "Bedrooms", min_value=0.0, max_value=20.0,
+                value=float(data["bedroom"].median()), step=1.0,
+            )
+            bathrooms = st.number_input(
+                "Bathrooms", min_value=0.0, max_value=20.0,
+                value=float(data["bathroom"].median()), step=1.0,
+            )
+            parking_lots = st.number_input(
+                "Parking Lots", min_value=0.0, max_value=20.0,
+                value=float(data["parking_lot"].median()), step=1.0,
+            )
+            facilities_count = st.number_input(
+                "Facilities Count", min_value=0, max_value=50,
+                value=int(data["facilities_count"].median()), step=1,
+            )
+            completion_year = st.number_input(
+                "Completion Year", min_value=1800, max_value=2030,
+                value=int(data["completion_year"].median()), step=1,
+            )
+            number_of_floors = st.number_input(
+                "Number of Floors", min_value=1, max_value=200,
+                value=max(1, int(data["number_of_floors"].median())), step=1,
+            )
+            total_units = st.number_input(
+                "Total Units", min_value=1, max_value=20_000,
+                value=max(1, int(data["total_units"].median())), step=1,
+            )
+        with category:
+            property_type = st.selectbox("Property Type", category_values(data, "property_type"))
+            tenure_type = st.selectbox("Tenure Type", category_values(data, "tenure_type"))
+            land_title = st.selectbox("Land Title", category_values(data, "land_title"))
+            floor_range = st.selectbox("Floor Range", category_values(data, "floor_range"))
+            state = st.selectbox("State", category_values(data, "state"))
+            city = st.selectbox("City / Locality", category_values(data, "city"))
+            building_name = st.text_input("Building Name (Optional)", value="")
+            developer = st.text_input("Developer (Optional)", value="")
+
+        st.write("#### Nearby Amenities")
+        nearby = st.columns(4)
+        has_school = int(nearby[0].checkbox("School"))
+        has_mall = int(nearby[1].checkbox("Mall"))
+        has_hospital = int(nearby[2].checkbox("Hospital"))
+        has_railway = int(nearby[3].checkbox("Railway Station"))
+        has_bus_stop = int(nearby[0].checkbox("Bus Stop"))
+        has_park = int(nearby[1].checkbox("Park"))
+        has_highway = int(nearby[2].checkbox("Highway"))
+
+        st.write("#### Property Facilities")
+        facilities = st.columns(5)
+        has_swimming_pool = int(facilities[0].checkbox("Swimming Pool"))
+        has_security = int(facilities[1].checkbox("Security"))
+        has_lift = int(facilities[2].checkbox("Lift"))
+        has_gym = int(facilities[3].checkbox("Gym"))
+        has_playground = int(facilities[4].checkbox("Playground"))
+
+        conditions = st.columns(2)
+        furnishing_status = conditions[0].selectbox(
+            "Furnishing Status", list(FURNISHING_STATUS_VALUES), index=0
+        )
+        renovation_status = conditions[1].selectbox(
+            "Renovation Status", list(RENOVATION_STATUS_VALUES), index=0
+        )
+        submitted = st.form_submit_button("Estimate Price", type="primary")
+
+    if not submitted:
+        return
+
+    condition_values = condition_feature_values(furnishing_status, renovation_status)
+    values = {
+        "property_size_sqft": property_size,
+        "bedroom": bedrooms,
+        "bathroom": bathrooms,
+        "parking_lot": parking_lots,
+        "facilities_count": facilities_count,
+        "has_school": has_school,
+        "has_mall": has_mall,
+        "has_hospital": has_hospital,
+        "has_railway": has_railway,
+        "has_bus_stop": has_bus_stop,
+        "has_park": has_park,
+        "has_highway": has_highway,
+        "completion_year": completion_year,
+        "number_of_floors": number_of_floors,
+        "total_units": total_units,
+        "has_swimming_pool": has_swimming_pool,
+        "has_security": has_security,
+        "has_lift": has_lift,
+        "has_gym": has_gym,
+        "has_playground": has_playground,
+        "is_furnished": condition_values["is_furnished"],
+        "is_renovated": condition_values["is_renovated"],
+        "property_type": property_type,
+        "tenure_type": tenure_type,
+        "land_title": land_title,
+        "floor_range": floor_range,
+        "state": state,
+        "building_name": building_name,
+        "developer": developer,
+        "city": city,
+    }
+    try:
+        selected_models = load_scope_models(selected_scope)
+        full_market_models = (
+            selected_models if selected_scope == "0%" else load_scope_models("0%")
+        )
+        selected_predictions = {
+            name: predict_scope_model(
+                name,
+                selected_models[name],
+                values,
+                description,
+                selected_models[name].description_length_median_,
+            )
+            for name in FINAL_MODELS
+        }
+        full_market_predictions = (
+            selected_predictions
+            if selected_scope == "0%"
+            else {
+                name: predict_scope_model(
+                    name,
+                    full_market_models[name],
+                    values,
+                    description,
+                    full_market_models[name].description_length_median_,
+                )
+                for name in FINAL_MODELS
+            }
+        )
+        output = prediction_comparison_frame(
+            selected_predictions,
+            full_market_predictions,
+        )
+    except ValueError as error:
+        st.error(str(error))
+        return
+
+    st.write("#### Four-Model Price Comparison")
+    styled = output.style.format(
+        {
+            "Selected-Scope Prediction": "RM {:,.0f}",
+            "Full-Market Prediction": "RM {:,.0f}",
+            "Difference (RM)": "RM {:+,.0f}",
+            "Difference (%)": "{:+.2f}%",
+        }
+    )
+    st.dataframe(styled, width="stretch", hide_index=True)
+    recommendation = recommended_model_for_scope(
+        load_all_models_trimming_summary(), selected_scope
+    )
+    st.success(
+        f"Recommended Model for {selected_scope} scope: {recommendation} "
+        "(lowest saved validation RMSE)."
+    )
+    if selected_scope == "0%":
+        st.caption(
+            "The selected scope is the full market, so both prediction columns use the "
+            "same cached deployment models and all differences are exactly zero."
+        )
+    st.warning(
+        "These are statistical listing-price estimates and not certified property valuations."
+    )
+
+
 def main() -> None:
     st.set_page_config(
         page_title="Real Estate Price Prediction Dashboard",
@@ -1193,8 +1849,7 @@ def main() -> None:
     if view not in {"Model Comparison", "Exploratory Data Analysis"}:
         st.caption("Scenario B leakage-safe group cross-validation")
     if view == "Model Comparison":
-        render_comparison(payload)
-        render_all_models_trimming_comparison()
+        render_scope_comparison_v2()
     elif view == "Exploratory Data Analysis":
         render_eda_page()
     elif view == "Feature Importance":
@@ -1204,7 +1859,7 @@ def main() -> None:
     elif view == "Outlier & Trimming Analysis":
         render_outlier_trimming()
     elif view == "Live House Price Predictor":
-        render_live_predictor(data)
+        render_scope_predictor(data)
 
 
 if __name__ == "__main__":

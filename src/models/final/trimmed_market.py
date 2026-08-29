@@ -6,12 +6,16 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.base import clone
 
 from src.cleaning.pipeline import PROJECT_ROOT
 from src.models.common.features import MODEL_FEATURES
 from src.models.final.description_linkage import link_descriptions
+from src.models.final.final_evaluation import FINAL_MODELS
+from src.models.final.model_builders import build_standard_ppsf_estimator
 from src.models.final.position_regex_lightgbm import (
     DATA_PATH,
+    FINAL_MODEL_NAME,
     RAW_PATH,
     PositionRegexLightGBM,
 )
@@ -161,3 +165,67 @@ def fit_trimmed_market_model(
     model.trim_cutoff_RM_ = metadata["cutoff_RM"]
     model.original_training_rows_ = EXPECTED_CANONICAL_ROWS
     return model
+
+
+def fit_market_scope_models(
+    trim_level: float,
+    data_path: Path = DATA_PATH,
+    raw_path: Path = RAW_PATH,
+    distribution_path: Path = TRIM_DISTRIBUTION_PATH,
+) -> dict[str, object]:
+    """Fit the four frozen deployment families for one validated market scope.
+
+    The saved cutoff determines the training population.  A live property is
+    never used to derive a cutoff, and callers are expected to cache this
+    function by ``trim_level`` at the application boundary.
+    """
+    level = _validated_trim_level(trim_level)
+    canonical = pd.read_csv(data_path).reset_index(drop=True)
+    required = {"listing_id", "price", *MODEL_FEATURES}
+    missing = sorted(required.difference(canonical.columns))
+    if missing:
+        raise ValueError(f"Canonical dataset is missing required columns: {missing}")
+    if (
+        len(canonical) != EXPECTED_CANONICAL_ROWS
+        or canonical["listing_id"].nunique() != EXPECTED_CANONICAL_ROWS
+    ):
+        raise AssertionError(
+            "Market-scope deployment fitting requires all 3,791 canonical listings "
+            "before applying the saved scope cutoff."
+        )
+
+    descriptions, _ = link_descriptions(raw_path, canonical["listing_id"])
+    retained = get_trimmed_population(canonical, level, distribution_path)
+    retained_index = retained.index
+    retained_descriptions = descriptions.loc[retained_index].reset_index(drop=True)
+    retained = retained.reset_index(drop=True)
+    features = retained[MODEL_FEATURES]
+    target = retained["price"].to_numpy(float)
+    description_median = float(
+        pd.to_numeric(retained["description_length"], errors="coerce").median()
+    )
+
+    models: dict[str, object] = {}
+    for model_name in FINAL_MODELS[:-1]:
+        model = clone(build_standard_ppsf_estimator(model_name)).fit(features, target)
+        model.training_rows_ = len(retained)
+        model.description_length_median_ = description_median
+        model.trim_level_ = level
+        model.original_training_rows_ = EXPECTED_CANONICAL_ROWS
+        models[model_name] = model
+
+    lightgbm_model = PositionRegexLightGBM().fit(
+        features,
+        target,
+        retained_descriptions,
+    )
+    lightgbm_model.trim_level_ = level
+    lightgbm_model.original_training_rows_ = EXPECTED_CANONICAL_ROWS
+    models[FINAL_MODEL_NAME] = lightgbm_model
+
+    metadata = get_trim_market_metadata(level, distribution_path)
+    if tuple(models) != FINAL_MODELS:
+        raise AssertionError("Market-scope deployment model order is inconsistent.")
+    if any(model.training_rows_ != metadata["retained_rows"] for model in models.values()):
+        raise AssertionError("A market-scope model used an unexpected training row count.")
+    return models

@@ -67,11 +67,12 @@ Saved final artifacts are under `results/final_models/`:
 - `feature_importance.csv`
 
 The completed upper-tail study is exported separately to
-`results/outlier_trimming/`. Its final recommendation is **0% trimming**:
-every nonzero training-only level worsened both RMSE and MAE on the full
-3,791-listing validation population. `retained_cv_summary.csv` records the
-actual training and validation counts for each of the five preserved Scenario B
-folds at every trim level.
+`results/outlier_trimming/`. The presentation now defaults to the **10% restricted
+market scope**, while preserving 0%, 0.5%, 1%, 2.5%, 5%, and 10% as the six
+validated choices. The separate training-only experiment still records 0% as its
+full-market recommendation; the dashboard does not reinterpret that historical
+result. `retained_cv_summary.csv` records the actual training and validation
+counts for each of the five preserved Scenario B folds at every scope.
 
 ## Data
 
@@ -88,19 +89,21 @@ evaluation.
 The application has one maintained implementation in `prototype/app.py`; root
 `app.py` is a thin launcher. It provides:
 
-1. Model Comparison
+1. Model Comparison with an independent market-scope selector and source-backed tuning details
 2. Feature Importance
 3. Actual vs Predicted using saved Scenario B OOF predictions
 4. Outlier & Trimming Analysis using saved presentation artifacts, including
    retained-population five-fold training/validation counts
-5. Live House Price Predictor using the all-data Position-feature LightGBM model
+5. Live House Price Predictor comparing all four selected-scope models with their 0% full-market counterparts
 
 The dashboard loads saved final metrics instead of rerunning cross-validation.
 The trimming page reads only from `results/outlier_trimming/` and performs no
 model fitting. Its source experiment can therefore be archived later without
 breaking the application.
-Only the selected final model is fitted for live inference, once per Streamlit
-process through `st.cache_resource`.
+The comparison page reads saved validation results and never fits models. For
+live inference, each requested scope fits the four frozen deployment families
+once per Streamlit process through `st.cache_resource`; ordinary property-form
+changes do not retrain them. Both market-scope selectors default to 10%.
 
 Install and launch:
 
