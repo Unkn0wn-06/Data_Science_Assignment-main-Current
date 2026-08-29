@@ -19,6 +19,7 @@ import pandas as pd
 import sklearn
 from sklearn.base import clone
 from sklearn.model_selection import ParameterSampler
+from src.models.final.model_builders import final_tuned_params_sha256
 
 from src.cleaning.pipeline import PROJECT_ROOT
 from src.models.common.features import MODEL_FEATURES
@@ -361,7 +362,7 @@ def tune_models() -> tuple[pd.DataFrame, pd.DataFrame, dict]:
         "selected_parameters": {
             name: config["models"][name]["parameters"] for name in FINAL_MODELS
         },
-        "frozen_configuration_sha256": sha256(FINAL_TUNED_PARAMS_PATH),
+        "frozen_configuration_sha256": final_tuned_params_sha256(),
         "artifacts": {
             "pre_tuning_model_comparison": PRE_TUNING_PATH.relative_to(PROJECT_ROOT).as_posix(),
             "tuning_candidates": "results/tuning/tuning_candidates.csv",

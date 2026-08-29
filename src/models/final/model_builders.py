@@ -54,11 +54,25 @@ def get_final_model_parameters(model_name: str) -> dict:
     return dict(load_final_tuned_config()["models"][model_name]["parameters"])
 
 
-def final_tuned_params_sha256(path: Path = FINAL_TUNED_PARAMS_PATH) -> str:
-    """Fingerprint the tuned configuration for application cache invalidation."""
+def final_tuned_params_sha256(
+    path: Path = FINAL_TUNED_PARAMS_PATH
+) -> str:
+    """Create a platform-independent fingerprint of the tuned configuration."""
     if not path.is_file():
-        raise FileNotFoundError(f"Authoritative tuned configuration is missing: {path}")
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+        raise FileNotFoundError(
+            f"Authoritative tuned configuration is missing: {path}"
+        )
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+
+    canonical = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def build_standard_ppsf_estimator(
