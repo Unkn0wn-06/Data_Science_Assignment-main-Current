@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import numpy as np
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 import seaborn as sns
 import streamlit as st
 
@@ -111,10 +113,31 @@ def _finish(fig: Figure) -> Figure:
     return fig
 
 
-def _record(fig: Figure, **metadata) -> Figure:
+EDA_FIGURE = Figure | go.Figure
+
+
+def _record(fig: EDA_FIGURE, **metadata) -> EDA_FIGURE:
     """Attach analytical-contract metadata for regression tests and maintenance."""
     fig._eda_metadata = metadata  # type: ignore[attr-defined]
     return fig
+
+
+def _plotly_layout(fig: go.Figure, *, height: int = 520) -> go.Figure:
+    fig.update_layout(
+        height=height,
+        margin={"l": 30, "r": 30, "t": 70, "b": 40},
+        legend_title_text="",
+        hoverlabel={"namelength": -1},
+    )
+    return fig
+
+
+def _heatmap_values(frame: pd.DataFrame) -> np.ndarray:
+    """Return Plotly-safe cells, representing unavailable groups with ``None``."""
+    values = frame.to_numpy(dtype=float)
+    if np.isinf(values).any():
+        raise ValueError("EDA heatmap values must be finite where present.")
+    return frame.astype(object).where(frame.notna(), None).to_numpy()
 
 
 def dataset_overview_frame(
@@ -183,34 +206,36 @@ def descriptive_statistics_frame(canonical: pd.DataFrame) -> pd.DataFrame:
 
 def build_average_price_by_state(
     raw: pd.DataFrame, prepared: pd.DataFrame, canonical: pd.DataFrame
-) -> Figure:
+) -> go.Figure:
     grouped = (
         canonical.groupby("state", as_index=False, observed=True)
         .agg(Mean_Price=("price", "mean"), Count=("listing_id", "size"))
         .loc[lambda frame: frame["Count"].ge(10)]
         .sort_values("Mean_Price")
     )
-    fig, ax = _new_figure((10, 7))
-    sns.barplot(
-        data=grouped,
+    fig = px.bar(
+        grouped,
         x="Mean_Price",
         y="state",
-        hue="state",
-        palette="viridis",
-        legend=False,
-        ax=ax,
+        orientation="h",
+        color="Mean_Price",
+        color_continuous_scale="Viridis",
+        custom_data=["Count"],
+        title="Average Property Listing Price by State",
+        labels={"Mean_Price": "Average Listing Price (RM)", "state": "State"},
     )
-    ax.set_title("Average Property Listing Price by State")
-    ax.set_xlabel("Average Listing Price (RM)")
-    ax.set_ylabel("State")
-    ax.ticklabel_format(style="plain", axis="x")
+    fig.update_traces(
+        hovertemplate="<b>%{y}</b><br>Average price: RM %{x:,.0f}<br>Listings: %{customdata[0]:,}<extra></extra>"
+    )
+    fig.update_layout(coloraxis_showscale=False)
+    fig.update_xaxes(tickformat=",")
     _record(fig, chart_type="horizontal_bar", minimum_state_count=10, states=grouped["state"].tolist())
-    return _finish(fig)
+    return _plotly_layout(fig, height=600)
 
 
 def build_condo_mean_median_by_state(
     raw: pd.DataFrame, prepared: pd.DataFrame, canonical: pd.DataFrame
-) -> Figure:
+) -> go.Figure:
     grouped = (
         _condominiums(canonical)
         .groupby("state", as_index=False, observed=True)
@@ -224,23 +249,24 @@ def build_condo_mean_median_by_state(
         var_name="Statistic",
         value_name="Listing Price (RM)",
     )
-    fig, ax = _new_figure((11, 6))
-    sns.barplot(
-        data=long,
+    fig = px.bar(
+        long,
         x="state",
         y="Listing Price (RM)",
-        hue="Statistic",
-        order=grouped["state"].tolist(),
-        palette=[REPORT_PALETTE[0], REPORT_PALETTE[1]],
-        ax=ax,
+        color="Statistic",
+        barmode="group",
+        category_orders={"state": grouped["state"].tolist()},
+        color_discrete_sequence=REPORT_PALETTE[:2],
+        custom_data=["Count"],
+        title="Mean and Median Condominium Price by State",
     )
-    ax.set_title("Mean and Median Condominium Price by State")
-    ax.set_xlabel("State")
-    ax.set_ylabel("Listing Price (RM)")
-    ax.tick_params(axis="x", rotation=45)
-    ax.ticklabel_format(style="plain", axis="y")
+    fig.update_traces(
+        hovertemplate="<b>%{x}</b><br>%{fullData.name}: RM %{y:,.0f}<br>Listings: %{customdata[0]:,}<extra></extra>"
+    )
+    fig.update_xaxes(tickangle=-35)
+    fig.update_yaxes(tickformat=",")
     _record(fig, chart_type="grouped_bar", minimum_state_count=10, statistics=["Mean", "Median"])
-    return _finish(fig)
+    return _plotly_layout(fig)
 
 
 def build_property_type_price_distribution(
@@ -276,24 +302,34 @@ def build_property_type_price_distribution(
 
 def build_condo_price_by_bedrooms(
     raw: pd.DataFrame, prepared: pd.DataFrame, canonical: pd.DataFrame
-) -> Figure:
+) -> go.Figure:
     frame = _condominiums(canonical)
     frame = frame[frame["bedroom"].between(1, 5)]
-    grouped = frame.groupby("bedroom", as_index=False, observed=True)["price"].median()
-    fig, ax = _new_figure((9, 6))
-    sns.lineplot(data=grouped, x="bedroom", y="price", marker="o", color=REPORT_PALETTE[0], ax=ax)
-    ax.set_title("Median Condominium Price by Bedroom Count")
-    ax.set_xlabel("Number of Bedrooms")
-    ax.set_ylabel("Median Listing Price (RM)")
-    ax.set_xticks(grouped["bedroom"].astype(int).tolist())
-    ax.ticklabel_format(style="plain", axis="y")
+    grouped = frame.groupby("bedroom", as_index=False, observed=True).agg(
+        price=("price", "median"), Count=("listing_id", "size")
+    )
+    fig = px.line(
+        grouped,
+        x="bedroom",
+        y="price",
+        markers=True,
+        custom_data=["Count"],
+        title="Median Condominium Price by Bedroom Count",
+        labels={"bedroom": "Number of Bedrooms", "price": "Median Listing Price (RM)"},
+    )
+    fig.update_traces(
+        line_color=REPORT_PALETTE[0],
+        hovertemplate="Bedrooms: %{x:.0f}<br>Median price: RM %{y:,.0f}<br>Listings: %{customdata[0]:,}<extra></extra>",
+    )
+    fig.update_xaxes(dtick=1)
+    fig.update_yaxes(tickformat=",")
     _record(fig, chart_type="line", marker="o", bedroom_range=(1, 5))
-    return _finish(fig)
+    return _plotly_layout(fig)
 
 
 def build_bedroom_size_heatmap(
     raw: pd.DataFrame, prepared: pd.DataFrame, canonical: pd.DataFrame
-) -> Figure:
+) -> go.Figure:
     frame = _condominiums(canonical)
     frame = frame[
         frame["bedroom"].between(1, 5)
@@ -312,11 +348,22 @@ def build_bedroom_size_heatmap(
         aggfunc="median",
         observed=False,
     ).reindex(index=range(1, 6), columns=BEDROOM_SIZE_LABELS)
-    fig, ax = _new_figure((11, 6))
-    sns.heatmap(pivot, annot=True, fmt=".0f", cmap="YlGnBu", linewidths=0.5, ax=ax)
-    ax.set_title("Median Condominium Price by Bedroom Count and Property Size")
-    ax.set_xlabel("Property Size (sq ft)")
-    ax.set_ylabel("Number of Bedrooms")
+    fig = go.Figure(
+        go.Heatmap(
+            z=_heatmap_values(pivot),
+            x=pivot.columns.tolist(),
+            y=pivot.index.tolist(),
+            colorscale="YlGnBu",
+            texttemplate="RM %{z:,.0f}",
+            colorbar={"title": "Median Price (RM)"},
+            hovertemplate="Bedrooms: %{y}<br>Size: %{x} sq ft<br>Median price: RM %{z:,.0f}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        title="Median Condominium Price by Bedroom Count and Property Size",
+        xaxis_title="Property Size (sq ft)",
+        yaxis_title="Number of Bedrooms",
+    )
     _record(
         fig,
         chart_type="heatmap",
@@ -325,20 +372,24 @@ def build_bedroom_size_heatmap(
         size_range=(300, 2000),
         size_bins=BEDROOM_SIZE_LABELS,
     )
-    return _finish(fig)
+    return _plotly_layout(fig)
 
 
 def build_condo_price_by_bathrooms(
     raw: pd.DataFrame, prepared: pd.DataFrame, canonical: pd.DataFrame
-) -> Figure:
+) -> go.Figure:
     frame = _condominiums(canonical)
     frame = frame[frame["bathroom"].between(1, 5)].copy()
-    fig, ax = _new_figure((9, 6))
-    sns.boxplot(data=frame, x="bathroom", y="price", showfliers=False, color="#93c5fd", ax=ax)
-    ax.set_title("Condominium Price Distribution by Bathroom Count")
-    ax.set_xlabel("Number of Bathrooms")
-    ax.set_ylabel("Listing Price (RM)")
-    ax.ticklabel_format(style="plain", axis="y")
+    fig = px.box(
+        frame,
+        x="bathroom",
+        y="price",
+        points=False,
+        title="Condominium Price Distribution by Bathroom Count",
+        labels={"bathroom": "Number of Bathrooms", "price": "Listing Price (RM)"},
+    )
+    fig.update_traces(marker_color="#93c5fd", hovertemplate="Bathrooms: %{x}<br>Price: RM %{y:,.0f}<extra></extra>")
+    fig.update_yaxes(tickformat=",")
     _record(
         fig,
         chart_type="boxplot",
@@ -346,7 +397,7 @@ def build_condo_price_by_bathrooms(
         bathroom_range=(1, 5),
         rows_used=len(frame),
     )
-    return _finish(fig)
+    return _plotly_layout(fig)
 
 
 def build_size_vs_price(
@@ -382,7 +433,7 @@ def build_size_vs_price(
 
 def build_condo_price_by_size_group(
     raw: pd.DataFrame, prepared: pd.DataFrame, canonical: pd.DataFrame
-) -> Figure:
+) -> go.Figure:
     frame = _condominiums(canonical)
     frame = frame[frame["property_size_sqft"].between(300, 5000)].copy()
     frame["Size Group"] = pd.cut(
@@ -396,66 +447,82 @@ def build_condo_price_by_size_group(
         .median()
         .rename(columns={"price": "Median Price"})
     )
-    fig, ax = _new_figure((10, 6))
-    sns.lineplot(
-        data=grouped,
+    fig = px.line(
+        grouped,
         x="Size Group",
         y="Median Price",
-        marker="o",
-        color=REPORT_PALETTE[0],
-        sort=False,
-        ax=ax,
+        markers=True,
+        category_orders={"Size Group": CONDO_SIZE_LABELS},
+        title="Median Condominium Price Across Property Size Groups",
+        labels={"Size Group": "Property Size Group (sq ft)", "Median Price": "Median Listing Price (RM)"},
     )
-    ax.set_title("Median Condominium Price Across Property Size Groups")
-    ax.set_xlabel("Property Size Group (sq ft)")
-    ax.set_ylabel("Median Listing Price (RM)")
-    ax.tick_params(axis="x", rotation=35)
-    ax.ticklabel_format(style="plain", axis="y")
+    fig.update_traces(
+        line_color=REPORT_PALETTE[0],
+        hovertemplate="Size group: %{x}<br>Median price: RM %{y:,.0f}<extra></extra>",
+    )
+    fig.update_xaxes(tickangle=-30)
+    fig.update_yaxes(tickformat=",")
     _record(fig, chart_type="line", marker="o", size_range=(300, 5000), size_bins=CONDO_SIZE_LABELS)
-    return _finish(fig)
+    return _plotly_layout(fig)
 
 
 def build_price_cdf_by_tenure(
     raw: pd.DataFrame, prepared: pd.DataFrame, canonical: pd.DataFrame
-) -> Figure:
+) -> go.Figure:
     frame = canonical[canonical["tenure_type"].isin(["Freehold", "Leasehold"])].copy()
-    fig, ax = _new_figure((10, 7))
-    sns.ecdfplot(data=frame, x="price", hue="tenure_type", palette=REPORT_PALETTE[:2], ax=ax)
-    ax.set_xscale("log")
-    ax.set_title("Cumulative Distribution of Listing Prices by Tenure")
-    ax.set_xlabel("Listing Price (RM, log scale)")
-    ax.set_ylabel("Cumulative Proportion")
+    fig = go.Figure()
+    for tenure, color in zip(["Freehold", "Leasehold"], REPORT_PALETTE[:2]):
+        values = np.sort(frame.loc[frame["tenure_type"].eq(tenure), "price"].to_numpy())
+        cumulative = np.arange(1, len(values) + 1) / len(values)
+        fig.add_trace(
+            go.Scatter(
+                x=values,
+                y=cumulative,
+                mode="lines",
+                name=tenure,
+                line={"color": color},
+                hovertemplate=f"<b>{tenure}</b><br>Price: RM %{{x:,.0f}}<br>Cumulative share: %{{y:.1%}}<extra></extra>",
+            )
+        )
+    fig.update_layout(
+        title="Cumulative Distribution of Listing Prices by Tenure",
+        xaxis_title="Listing Price (RM, log scale)",
+        yaxis_title="Cumulative Proportion",
+    )
+    fig.update_xaxes(type="log", tickformat=",")
+    fig.update_yaxes(tickformat=".0%")
     _record(fig, chart_type="ecdf", tenures=["Freehold", "Leasehold"], xscale="log")
-    return _finish(fig)
+    return _plotly_layout(fig)
 
 
 def build_condo_price_state_tenure(
     raw: pd.DataFrame, prepared: pd.DataFrame, canonical: pd.DataFrame
-) -> Figure:
+) -> go.Figure:
     frame = _condominiums(canonical)
     frame = frame[frame["tenure_type"].isin(["Freehold", "Leasehold"])].copy()
     state_counts = frame.groupby("state", observed=True).size()
     valid_states = state_counts[state_counts.ge(20)].index.tolist()
     frame = frame[frame["state"].isin(valid_states)]
-    fig, ax = _new_figure((12, 7))
-    sns.pointplot(
-        data=frame,
+    grouped = frame.groupby(["state", "tenure_type"], as_index=False, observed=True).agg(
+        price=("price", "median"), Count=("listing_id", "size")
+    )
+    fig = px.line(
+        grouped,
         x="state",
         y="price",
-        hue="tenure_type",
-        order=valid_states,
-        estimator=np.median,
-        errorbar=None,
-        dodge=0.3,
-        markers=["o", "s"],
-        palette=REPORT_PALETTE[:2],
-        ax=ax,
+        color="tenure_type",
+        markers=True,
+        category_orders={"state": valid_states, "tenure_type": ["Freehold", "Leasehold"]},
+        color_discrete_sequence=REPORT_PALETTE[:2],
+        custom_data=["Count"],
+        title="Median Condo Price by State and Tenure Type",
+        labels={"state": "State", "price": "Median Listing Price (RM)", "tenure_type": "Tenure Type"},
     )
-    ax.set_title("Median Condo Price by State and Tenure Type")
-    ax.set_xlabel("State")
-    ax.set_ylabel("Median Listing Price (RM)")
-    ax.tick_params(axis="x", rotation=45)
-    ax.ticklabel_format(style="plain", axis="y")
+    fig.update_traces(
+        hovertemplate="<b>%{x}</b><br>%{fullData.name}<br>Median price: RM %{y:,.0f}<br>Listings: %{customdata[0]:,}<extra></extra>"
+    )
+    fig.update_xaxes(tickangle=-35)
+    fig.update_yaxes(tickformat=",")
     _record(
         fig,
         chart_type="pointplot",
@@ -463,12 +530,12 @@ def build_condo_price_state_tenure(
         minimum_state_count=20,
         tenures=["Freehold", "Leasehold"],
     )
-    return _finish(fig)
+    return _plotly_layout(fig, height=560)
 
 
 def build_condo_price_by_completion_year(
     raw: pd.DataFrame, prepared: pd.DataFrame, canonical: pd.DataFrame
-) -> Figure:
+) -> go.Figure:
     frame = _condominiums(canonical)
     frame = frame[frame["completion_year"].between(1980, 2026)]
     grouped = (
@@ -477,19 +544,20 @@ def build_condo_price_by_completion_year(
         .loc[lambda values: values["Count"].ge(5)]
         .sort_values("completion_year")
     )
-    fig, ax = _new_figure((12, 6))
-    sns.lineplot(
-        data=grouped,
+    fig = px.line(
+        grouped,
         x="completion_year",
         y="Median",
-        marker="o",
-        color=REPORT_PALETTE[0],
-        ax=ax,
+        markers=True,
+        custom_data=["Count"],
+        title="Median Condominium Price by Completion Year",
+        labels={"completion_year": "Completion Year", "Median": "Median Listing Price (RM)"},
     )
-    ax.set_title("Median Condominium Price by Completion Year")
-    ax.set_xlabel("Completion Year")
-    ax.set_ylabel("Median Listing Price (RM)")
-    ax.ticklabel_format(style="plain", axis="y")
+    fig.update_traces(
+        line_color=REPORT_PALETTE[0],
+        hovertemplate="Year: %{x:.0f}<br>Median price: RM %{y:,.0f}<br>Listings: %{customdata[0]:,}<extra></extra>",
+    )
+    fig.update_yaxes(tickformat=",")
     _record(
         fig,
         chart_type="line",
@@ -497,12 +565,12 @@ def build_condo_price_by_completion_year(
         completion_year_range=(1980, 2026),
         minimum_year_count=5,
     )
-    return _finish(fig)
+    return _plotly_layout(fig)
 
 
 def build_condo_price_state_completion_period(
     raw: pd.DataFrame, prepared: pd.DataFrame, canonical: pd.DataFrame
-) -> Figure:
+) -> go.Figure:
     frame = _condominiums(canonical)
     state_counts = frame.groupby("state", observed=True).size()
     valid_states = state_counts[state_counts.ge(20)].index.tolist()
@@ -523,11 +591,22 @@ def build_condo_price_state_completion_period(
         aggfunc="median",
         observed=False,
     ).reindex(index=valid_states, columns=COMPLETION_LABELS)
-    fig, ax = _new_figure((12, 7))
-    sns.heatmap(pivot, annot=True, fmt=".0f", cmap="YlGnBu", linewidths=0.5, ax=ax)
-    ax.set_title("Median Condominium Price by State and Completion Period")
-    ax.set_xlabel("Completion Period")
-    ax.set_ylabel("State")
+    fig = go.Figure(
+        go.Heatmap(
+            z=_heatmap_values(pivot),
+            x=pivot.columns.tolist(),
+            y=pivot.index.tolist(),
+            colorscale="YlGnBu",
+            texttemplate="RM %{z:,.0f}",
+            colorbar={"title": "Median Price (RM)"},
+            hovertemplate="State: %{y}<br>Period: %{x}<br>Median price: RM %{z:,.0f}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        title="Median Condominium Price by State and Completion Period",
+        xaxis_title="Completion Period",
+        yaxis_title="State",
+    )
     _record(
         fig,
         chart_type="heatmap",
@@ -535,7 +614,7 @@ def build_condo_price_state_completion_period(
         completion_periods=COMPLETION_LABELS,
         minimum_state_count=20,
     )
-    return _finish(fig)
+    return _plotly_layout(fig, height=580)
 
 
 def build_price_distribution_by_land_title(
@@ -569,26 +648,23 @@ def build_price_distribution_by_land_title(
 
 def build_condo_price_by_floor_range(
     raw: pd.DataFrame, prepared: pd.DataFrame, canonical: pd.DataFrame
-) -> Figure:
+) -> go.Figure:
     order = ["Low", "Medium", "High"]
     frame = _condominiums(canonical)
     frame = frame[frame["floor_range"].isin(order)].copy()
-    fig, ax = _new_figure((9, 6))
-    sns.boxplot(
-        data=frame,
+    fig = px.box(
+        frame,
         x="floor_range",
         y="price",
-        order=order,
-        showfliers=False,
-        color="#93c5fd",
-        ax=ax,
+        points=False,
+        category_orders={"floor_range": order},
+        title="Condominium Price by Floor Range",
+        labels={"floor_range": "Floor Range", "price": "Listing Price (RM)"},
     )
-    ax.set_title("Condominium Price by Floor Range")
-    ax.set_xlabel("Floor Range")
-    ax.set_ylabel("Listing Price (RM)")
-    ax.ticklabel_format(style="plain", axis="y")
+    fig.update_traces(marker_color="#93c5fd", hovertemplate="Floor: %{x}<br>Price: RM %{y:,.0f}<extra></extra>")
+    fig.update_yaxes(tickformat=",")
     _record(fig, chart_type="boxplot", showfliers=False, floor_order=order, rows_used=len(frame))
-    return _finish(fig)
+    return _plotly_layout(fig)
 
 
 def build_condo_price_density_by_parking(
@@ -624,7 +700,7 @@ def build_condo_price_density_by_parking(
 
 def build_median_ppsf_state_property_type(
     raw: pd.DataFrame, prepared: pd.DataFrame, canonical: pd.DataFrame
-) -> Figure:
+) -> go.Figure:
     frame = _with_ppsf(canonical)
     frame = frame[frame["property_type"].isin(MAJOR_PROPERTY_TYPES)].copy()
     state_counts = frame.groupby("state", observed=True).size()
@@ -637,11 +713,22 @@ def build_median_ppsf_state_property_type(
         aggfunc="median",
         observed=True,
     ).reindex(index=valid_states, columns=MAJOR_PROPERTY_TYPES)
-    fig, ax = _new_figure((12, 8))
-    sns.heatmap(pivot, annot=True, fmt=".0f", cmap="YlGnBu", linewidths=0.5, ax=ax)
-    ax.set_title("Median Price per Square Foot by State and Property Type")
-    ax.set_xlabel("Property Type")
-    ax.set_ylabel("State")
+    fig = go.Figure(
+        go.Heatmap(
+            z=_heatmap_values(pivot),
+            x=pivot.columns.tolist(),
+            y=pivot.index.tolist(),
+            colorscale="YlGnBu",
+            texttemplate="RM %{z:,.0f}",
+            colorbar={"title": "Median PPSF (RM)"},
+            hovertemplate="State: %{y}<br>Property type: %{x}<br>Median PPSF: RM %{z:,.0f}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        title="Median Price per Square Foot by State and Property Type",
+        xaxis_title="Property Type",
+        yaxis_title="State",
+    )
     _record(
         fig,
         chart_type="heatmap",
@@ -650,31 +737,32 @@ def build_median_ppsf_state_property_type(
         minimum_state_count=20,
         ppsf_formula="price / property_size_sqft",
     )
-    return _finish(fig)
+    return _plotly_layout(fig, height=620)
 
 
 def build_ppsf_distribution_property_type(
     raw: pd.DataFrame, prepared: pd.DataFrame, canonical: pd.DataFrame
-) -> Figure:
+) -> go.Figure:
     frame = _with_ppsf(canonical)
     frame = frame[frame["property_type"].isin(MAJOR_PROPERTY_TYPES)].copy()
-    fig, ax = _new_figure((11, 7))
-    sns.violinplot(
-        data=frame,
+    fig = px.violin(
+        frame,
         x="property_type",
         y="price_psf",
-        order=MAJOR_PROPERTY_TYPES,
-        inner="quartile",
-        cut=0,
-        palette=REPORT_PALETTE,
-        hue="property_type",
-        legend=False,
-        ax=ax,
+        color="property_type",
+        box=True,
+        points=False,
+        category_orders={"property_type": MAJOR_PROPERTY_TYPES},
+        color_discrete_sequence=REPORT_PALETTE,
+        title="Price per Square Foot Distribution by Property Type",
+        labels={"property_type": "Property Type", "price_psf": "Price per Square Foot (RM)"},
     )
-    ax.set_title("Price per Square Foot Distribution by Property Type")
-    ax.set_xlabel("Property Type")
-    ax.set_ylabel("Price per Square Foot (RM)")
-    ax.ticklabel_format(style="plain", axis="y")
+    fig.update_traces(
+        spanmode="hard",
+        hovertemplate="%{x}<br>PPSF: RM %{y:,.0f}<extra></extra>",
+    )
+    fig.update_layout(showlegend=False)
+    fig.update_yaxes(tickformat=",")
     _record(
         fig,
         chart_type="violin",
@@ -682,7 +770,7 @@ def build_ppsf_distribution_property_type(
         inner="quartile",
         cut=0,
     )
-    return _finish(fig)
+    return _plotly_layout(fig, height=560)
 
 
 def build_missing_values_before_preparation(
@@ -746,7 +834,7 @@ def build_dataset_size_stages(
     return _finish(fig)
 
 
-ChartBuilder = Callable[[pd.DataFrame, pd.DataFrame, pd.DataFrame], Figure]
+ChartBuilder = Callable[[pd.DataFrame, pd.DataFrame, pd.DataFrame], EDA_FIGURE]
 EDA_VISUALIZATIONS: dict[str, dict[str, ChartBuilder]] = {
     "Price & Location": {
         "Average Property Listing Price by State": build_average_price_by_state,
@@ -778,47 +866,91 @@ EDA_VISUALIZATIONS: dict[str, dict[str, ChartBuilder]] = {
 }
 
 
-def render_eda_page() -> None:
-    """Render overview tables and exactly one selected report-style chart."""
-    st.subheader("Exploratory Data Analysis")
+EDA_INSIGHTS = {
+    "Average Property Listing Price by State": "State-level averages reveal how strongly location is associated with the listing-price level.",
+    "Mean and Median Condominium Price by State": "The gap between mean and median highlights states where premium condominium listings pull the average upward.",
+    "Listing Price Distribution by Property Type": "The log scale makes each major property type's broad and right-skewed price distribution comparable.",
+    "Median Condominium Price by Bedroom Count": "Median price generally changes with bedroom count, while the grouped view limits the influence of extreme listings.",
+    "Median Condominium Price by Bedroom Count and Property Size": "Bedroom count and floor area jointly segment condominium prices more clearly than either feature alone.",
+    "Condominium Price Distribution by Bathroom Count": "The box distributions show both the central price shift and substantial overlap across bathroom counts.",
+    "Listing Price Distribution by Land Title": "The letter-value plot compares the full price distribution for Bumi and Non-Bumi lots, including their tails.",
+    "Condominium Price by Floor Range": "Floor-range groups overlap considerably, indicating that floor position is only one component of listing price.",
+    "Condominium Price Density by Parking Allocation": "Parking-allocation densities show how price distributions shift while retaining substantial market overlap.",
+    "Property Size vs Listing Price": "The hexbin concentration and Pearson correlation summarize the positive size-price relationship without hiding listing density.",
+    "Median Condominium Price Across Property Size Groups": "Median condominium prices rise across the predefined size bands, with the grouped curve reducing outlier influence.",
+    "Cumulative Distribution of Listing Prices by Tenure": "The empirical cumulative curves compare the complete Freehold and Leasehold price distributions on a log-price scale.",
+    "Median Condo Price by State and Tenure Type": "Tenure-price differences vary by state, reinforcing the interaction between location and ownership type.",
+    "Median Condominium Price by Completion Year": "Year medians describe the development-age pattern only where at least five condominium listings are available.",
+    "Median Condominium Price by State and Completion Period": "The heatmap exposes how development period and state combine to create different condominium price segments.",
+    "Median Price per Square Foot by State and Property Type": "PPSF varies across both state and property type, separating location intensity from total property size.",
+    "Price per Square Foot Distribution by Property Type": "The violin shapes and embedded box summaries compare the spread and central tendency of PPSF across major property types.",
+}
+
+
+def render_eda_figure(figure: EDA_FIGURE) -> None:
+    """Route interactive and specialized static EDA figures to the right renderer."""
+    if isinstance(figure, go.Figure):
+        st.plotly_chart(
+            figure,
+            width="stretch",
+            config={"displayModeBar": False, "scrollZoom": False},
+        )
+        return
+    st.pyplot(figure, width="stretch")
+    plt.close(figure)
+
+
+def render_eda_page(category: str | None = None, chart_name: str | None = None) -> None:
+    """Render one sidebar-selected chart with supporting tables on demand."""
+    st.header("Data & EDA")
+    st.caption("Explore the prepared Malaysian residential listing dataset.")
     raw, prepared, canonical = load_eda_sources()
 
-    st.write("### Dataset Overview")
-    overview = dataset_overview_frame(raw, prepared, canonical)
-    st.dataframe(
-        overview.style.format(
-            {
-                "Rows": "{:,}",
-                "Columns": "{:,}",
-                "Missing Cells": "{:,}",
-                "Duplicate Rows": "{:,}",
-            }
-        ),
-        width="stretch",
-        hide_index=True,
-    )
-
-    st.write("### Descriptive Statistics")
-    statistics = descriptive_statistics_frame(canonical)
-    st.dataframe(
-        statistics.style.format(
-            {column: "{:,.2f}" for column in statistics.columns if column != "Feature"}
-        ),
-        width="stretch",
-        hide_index=True,
+    cards = st.columns(4)
+    cards[0].metric("Prepared Listings", f"{len(canonical):,}")
+    cards[1].metric("Available Features", f"{len(canonical.columns):,}")
+    cards[2].metric("Median Listing Price", f"RM {canonical['price'].median():,.0f}")
+    cards[3].metric(
+        "Listing Price Range",
+        f"RM {canonical['price'].min():,.0f} – RM {canonical['price'].max():,.0f}",
     )
 
     st.write("### Visual Analysis")
-    category = st.selectbox(
-        "EDA Category",
-        list(EDA_VISUALIZATIONS),
-        key="eda_category",
-    )
-    chart_name = st.selectbox(
-        "Select Visualization",
-        list(EDA_VISUALIZATIONS[category]),
-        key="eda_visualization",
-    )
+    category = category or next(iter(EDA_VISUALIZATIONS))
+    if category not in EDA_VISUALIZATIONS:
+        raise ValueError(f"Unknown EDA category: {category}")
+    chart_name = chart_name or next(iter(EDA_VISUALIZATIONS[category]))
+    if chart_name not in EDA_VISUALIZATIONS[category]:
+        raise ValueError(f"Unknown EDA visualization: {chart_name}")
     figure = EDA_VISUALIZATIONS[category][chart_name](raw, prepared, canonical)
-    st.pyplot(figure, width="stretch")
-    plt.close(figure)
+    render_eda_figure(figure)
+    if isinstance(figure, go.Figure):
+        st.caption("Hover over the chart for exact values and listing counts where available.")
+    else:
+        st.caption("This specialized statistical view is rendered as a static analytical figure.")
+    st.info(EDA_INSIGHTS[chart_name])
+
+    with st.expander("Dataset Preparation Summary"):
+        overview = dataset_overview_frame(raw, prepared, canonical)
+        st.dataframe(
+            overview.style.format(
+                {
+                    "Rows": "{:,}",
+                    "Columns": "{:,}",
+                    "Missing Cells": "{:,}",
+                    "Duplicate Rows": "{:,}",
+                }
+            ),
+            width="stretch",
+            hide_index=True,
+        )
+
+    with st.expander("Descriptive Statistics"):
+        statistics = descriptive_statistics_frame(canonical)
+        st.dataframe(
+            statistics.style.format(
+                {column: "{:,.2f}" for column in statistics.columns if column != "Feature"}
+            ),
+            width="stretch",
+            hide_index=True,
+        )

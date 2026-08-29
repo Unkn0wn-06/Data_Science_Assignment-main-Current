@@ -12,7 +12,12 @@ from streamlit.testing.v1 import AppTest
 
 from prototype.app import (
     COMPARISON_METRICS,
+    DIAGNOSTICS_VIEW,
+    EVALUATION_VIEW,
     MARKET_SCOPE_OPTIONS,
+    OUTLIER_VIEW,
+    PREDICTOR_VIEW,
+    VIEWS,
     actual_vs_predicted_plot_frame,
     build_official_metric_chart,
     condition_feature_values,
@@ -24,7 +29,8 @@ from prototype.app import (
     predict_scope_model,
     prediction_comparison_frame,
     recommended_model_for_scope,
-    render_scope_comparison_v2,
+    render_outlier_trimming,
+    render_model_evaluation,
     render_scope_predictor,
     scope_comparison_frame,
 )
@@ -43,34 +49,76 @@ class ScopeAwareStreamlitTests(unittest.TestCase):
             PROJECT_ROOT / "data" / "processed" / "enhanced_city_dataset.csv"
         ).reset_index(drop=True)
 
+    def test_overview_orients_without_revealing_project_conclusions(self):
+        app = AppTest.from_file(str(PROJECT_ROOT / "app.py")).run(timeout=60)
+        self.assertEqual([], list(app.exception))
+        self.assertEqual(VIEWS[0], app.sidebar.radio[0].value)
+        self.assertEqual(
+            {
+                "Prepared Listings": "3,791",
+                "Prepared Features": "34",
+                "Problem Type": "Regression",
+                "Target Variable": "Listing Price (RM)",
+            },
+            {item.label: item.value for item in app.main.metric},
+        )
+        main_text = "\n".join(
+            item.value
+            for element_type in ("header", "markdown", "caption", "text")
+            for item in app.main.get(element_type)
+            if isinstance(item.value, str)
+        )
+        for hidden_result in (
+            FINAL_MODEL_NAME,
+            "RMSE",
+            "MAE",
+            "R²",
+            "0% Trimming",
+            "Final Full-Market Performance",
+        ):
+            self.assertNotIn(hidden_result, main_text)
+        for section in (
+            "### Project at a Glance",
+            "### Project Objective",
+            "### What Does the Dataset Contain?",
+            "### Project Workflow",
+            "### Explore the Project",
+        ):
+            self.assertIn(section, main_text)
+
+        sidebar_text = "\n".join(item.value for item in app.sidebar.caption)
+        self.assertIn("Problem\n\nRegression", sidebar_text)
+        self.assertNotIn(FINAL_MODEL_NAME, sidebar_text)
+        self.assertNotIn("Upper-Tail Trimming", sidebar_text)
+
     def test_model_comparison_defaults_and_updates_from_saved_scope_results(self):
         app = AppTest.from_file(str(PROJECT_ROOT / "app.py")).run(timeout=60)
+        self.assertEqual(VIEWS[0], app.sidebar.radio[0].value)
+        app.sidebar.radio[0].set_value(EVALUATION_VIEW).run(timeout=60)
         self.assertEqual([], list(app.exception))
         self.assertEqual(1, len(app.get("plotly_chart")))
 
         selectors = {item.label: item for item in app.selectbox}
-        self.assertEqual(
-            ["Select Market Scope", "Select Evaluation Metric", "Select Model for Hyperparameter Details"],
-            [item.label for item in app.selectbox],
-        )
-        scope = selectors["Select Market Scope"]
+        scope = selectors["Market Scope"]
         self.assertEqual(list(MARKET_SCOPE_OPTIONS), list(scope.options))
         self.assertEqual("10%", scope.value)
-        self.assertEqual(list(COMPARISON_METRICS), list(selectors["Select Evaluation Metric"].options))
-        self.assertEqual(FINAL_MODEL_NAME, selectors["Select Model for Hyperparameter Details"].value)
-        self.assertEqual(list(FINAL_MODELS), list(selectors["Select Model for Hyperparameter Details"].options))
+        self.assertEqual("evaluation_market_scope", scope.key)
+        self.assertEqual(list(COMPARISON_METRICS), list(selectors["Evaluation Metric"].options))
+        self.assertEqual(FINAL_MODEL_NAME, selectors["Model for Hyperparameter Details"].value)
+        self.assertEqual(list(FINAL_MODELS), list(selectors["Model for Hyperparameter Details"].options))
 
-        expected = normalized_scope_display_frame(self.summary, "10%")
-        pd.testing.assert_frame_equal(expected, app.dataframe[0].value, check_dtype=False)
         spec = json.loads(app.get("plotly_chart")[0].proto.spec)
         self.assertEqual("RMSE by Model", spec["layout"]["title"]["text"])
+        recommended = recommended_model_for_scope(self.summary, "10%")
+        expected = scope_comparison_frame(self.summary, "10%").set_index("Model").loc[recommended]
+        metric_values = {item.label: item.value for item in app.metric}
+        self.assertEqual(f"RM {expected['RMSE_RM']:,.0f}", metric_values["RMSE"])
 
         scope.set_value("5%").run(timeout=60)
         self.assertEqual([], list(app.exception))
-        expected = normalized_scope_display_frame(self.summary, "5%")
-        pd.testing.assert_frame_equal(expected, app.dataframe[0].value, check_dtype=False)
+        self.assertEqual("5%", next(item for item in app.selectbox if item.label == "Market Scope").value)
 
-        metric = next(item for item in app.selectbox if item.label == "Select Evaluation Metric")
+        metric = next(item for item in app.selectbox if item.label == "Evaluation Metric")
         metric.set_value("Adjusted R\u00b2").run(timeout=60)
         spec = json.loads(app.get("plotly_chart")[0].proto.spec)
         self.assertEqual("Adjusted R\u00b2 by Model", spec["layout"]["title"]["text"])
@@ -78,9 +126,9 @@ class ScopeAwareStreamlitTests(unittest.TestCase):
 
     def test_predictor_scope_selector_is_independent_and_defaults_to_ten_percent(self):
         app = AppTest.from_file(str(PROJECT_ROOT / "app.py")).run(timeout=60)
-        app.sidebar.radio[0].set_value("Live House Price Predictor").run(timeout=60)
+        app.sidebar.radio[0].set_value(PREDICTOR_VIEW).run(timeout=60)
         self.assertEqual([], list(app.exception))
-        selector = next(item for item in app.selectbox if item.label == "Select Market Scope")
+        selector = next(item for item in app.selectbox if item.label == "Market Scope")
         self.assertEqual(list(MARKET_SCOPE_OPTIONS), list(selector.options))
         self.assertEqual("10%", selector.value)
         self.assertEqual("predictor_market_scope", selector.key)
@@ -90,7 +138,7 @@ class ScopeAwareStreamlitTests(unittest.TestCase):
         self.assertEqual([], list(app.exception))
         self.assertEqual("0%", selector.value)
         self.assertEqual(0, len(app.dataframe))
-        app.button[0].click().run(timeout=120)
+        next(item for item in app.button if item.label == "Estimate Property Price").click().run(timeout=120)
         self.assertEqual([], list(app.exception))
         self.assertEqual(1, len(app.dataframe))
         output = app.dataframe[0].value
@@ -171,7 +219,7 @@ class ScopeAwareStreamlitTests(unittest.TestCase):
         self.assertTrue(lightgbm["final_parameters"]["Status"].eq("Fixed model parameter").all())
 
     def test_comparison_interactions_do_not_fit_models(self):
-        source = inspect.getsource(render_scope_comparison_v2)
+        source = inspect.getsource(render_model_evaluation)
         self.assertNotIn("load_scope_models", source)
         self.assertNotIn("fit_", source)
         self.assertIn("load_all_models_trimming_summary", source)
@@ -241,25 +289,24 @@ class ScopeAwareStreamlitTests(unittest.TestCase):
 
     def test_actual_vs_predicted_controls_metrics_and_scope_update_together(self):
         app = AppTest.from_file(str(PROJECT_ROOT / "app.py")).run(timeout=60)
-        app.sidebar.radio[0].set_value("Actual vs Predicted").run(timeout=60)
+        app.sidebar.radio[0].set_value(DIAGNOSTICS_VIEW).run(timeout=60)
+        next(item for item in app.radio if item.label == "Diagnostic View").set_value(
+            "Actual vs Predicted"
+        ).run(timeout=60)
         self.assertEqual([], list(app.exception))
         selectors = {item.label: item for item in app.selectbox}
-        self.assertEqual(
-            ["Select Model to Visualize", "Select Trimming Level"],
-            [item.label for item in app.selectbox],
-        )
-        trim = selectors["Select Trimming Level"]
+        trim = selectors["Market Scope"]
         self.assertEqual(list(MARKET_SCOPE_OPTIONS), list(trim.options))
         self.assertEqual("10%", trim.value)
         self.assertEqual("prediction_trim_level", trim.key)
         self.assertFalse(any(item.label == "Listing Segment" for item in app.radio))
         default_metrics = {item.label: item.value for item in app.metric}
-        self.assertEqual("3,412", default_metrics["Retained Listings"])
-        self.assertEqual("379", default_metrics["Removed Listings"])
-        self.assertEqual("90.00%", default_metrics["Retention Percentage"])
-        self.assertEqual(
-            "RM 699,999", default_metrics["Maximum Retained Actual Price"]
-        )
+        self.assertEqual({"RMSE", "MAE", "R²"}, set(default_metrics))
+        scope_details = app.dataframe[0].value.iloc[0]
+        self.assertEqual(3_412, scope_details["Retained Listings"])
+        self.assertEqual(379, scope_details["Removed Listings"])
+        self.assertAlmostEqual(90.0026, scope_details["Retention Percentage"], places=3)
+        self.assertEqual(699_999, scope_details["Maximum Retained Actual Price"])
 
         trim.set_value("5%").run(timeout=60)
         self.assertEqual([], list(app.exception))
@@ -270,19 +317,18 @@ class ScopeAwareStreamlitTests(unittest.TestCase):
         metric_values = {item.label: item.value for item in app.metric}
         self.assertEqual(f"RM {expected['RMSE_RM']:,.0f}", metric_values["RMSE"])
         self.assertEqual(f"RM {expected['MAE_RM']:,.0f}", metric_values["MAE"])
-        self.assertEqual("3,601", metric_values["Retained Listings"])
-        self.assertEqual("190", metric_values["Removed Listings"])
-        self.assertEqual("RM 900,000", metric_values["Maximum Retained Actual Price"])
+        scope_details = app.dataframe[0].value.iloc[0]
+        self.assertEqual(3_601, scope_details["Retained Listings"])
+        self.assertEqual(190, scope_details["Removed Listings"])
+        self.assertEqual(900_000, scope_details["Maximum Retained Actual Price"])
         spec = json.loads(app.get("plotly_chart")[0].proto.spec)
         self.assertEqual(
             f"{FINAL_MODEL_NAME}: Actual vs OOF Predicted Price \u2014 5% Trimming",
             spec["layout"]["title"]["text"],
         )
-        self.assertIn("Displayed listings: 3,601", app.caption[-1].value)
+        self.assertTrue(any("Displayed listings: 3,601" in item.value for item in app.caption))
 
-        model = next(
-            item for item in app.selectbox if item.label == "Select Model to Visualize"
-        )
+        model = next(item for item in app.selectbox if item.key == "prediction_model")
         model.set_value("Ridge Regression").run(timeout=60)
         expected_ridge = self.summary.loc[
             self.summary["Model"].eq("Ridge Regression")
@@ -292,6 +338,67 @@ class ScopeAwareStreamlitTests(unittest.TestCase):
         self.assertEqual(
             f"RM {expected_ridge['RMSE_RM']:,.0f}", metric_values["RMSE"]
         )
+
+    def test_outlier_page_is_explanatory_without_redundant_scope_controls(self):
+        app = AppTest.from_file(str(PROJECT_ROOT / "app.py")).run(timeout=60)
+        app.sidebar.radio[0].set_value(OUTLIER_VIEW).run(timeout=60)
+        self.assertEqual([], list(app.exception))
+        self.assertEqual([], list(app.selectbox))
+        self.assertEqual(
+            [
+                "### Outlier Detection",
+                "### Outlier Treatment Methods",
+                "### Premium Property Impact",
+                "### Statistical Validation",
+            ],
+            [
+                item.value
+                for item in app.main.markdown
+                if item.value.startswith("###")
+            ],
+        )
+        plot_titles = [
+            json.loads(item.proto.spec)["layout"]["title"]["text"]
+            for item in app.get("plotly_chart")
+        ]
+        self.assertEqual(
+            [
+                "Saved Listing-Price Distribution Landmarks",
+                "Premium Underprediction as Training Examples Are Removed",
+            ],
+            plot_titles,
+        )
+        self.assertEqual(
+            [
+                "View Outlier Treatment Methods",
+                "View Detailed Premium-Segment Results",
+                "View Bootstrap Statistical Results",
+                "Technical Details",
+            ],
+            [item.label for item in app.expander],
+        )
+        self.assertEqual(
+            "Final Full-Market Decision: 0% Upper-Tail Trimming",
+            app.success[0].value,
+        )
+        self.assertTrue(
+            any(
+                "10% default" in item.value
+                and "official 0% full-market strategy" in item.value
+                for item in app.info
+            )
+        )
+
+        source = inspect.getsource(render_outlier_trimming)
+        for removed_text in (
+            "Market Scope After Trimming",
+            "Retained-population trim level",
+            "Retained Data Training & Validation",
+            "Maximum Retained Price Across Trim Levels",
+            "Training and Validation Listings by Fold",
+        ):
+            self.assertNotIn(removed_text, source)
+        self.assertIn("load_trimming_results", source)
 
 
 if __name__ == "__main__":

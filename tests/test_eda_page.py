@@ -9,6 +9,7 @@ import unittest
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import numpy as np
+import plotly.graph_objects as go
 
 from prototype import eda_page
 from prototype.eda_page import (
@@ -17,12 +18,14 @@ from prototype.eda_page import (
     COMPLETION_LABELS,
     CONDO_SIZE_LABELS,
     CURRENT_PREPARED_PATH,
+    EDA_INSIGHTS,
     EDA_VISUALIZATIONS,
     MAJOR_PROPERTY_TYPES,
     RAW_PATH,
     dataset_overview_frame,
     descriptive_statistics_frame,
     load_eda_sources,
+    render_eda_figure,
     render_eda_page,
 )
 
@@ -31,7 +34,9 @@ def sha256(path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def displayed_title(figure: Figure) -> str:
+def displayed_title(figure: Figure | go.Figure) -> str:
+    if isinstance(figure, go.Figure):
+        return str(figure.layout.title.text)
     if figure._suptitle is not None:
         return figure._suptitle.get_text()
     return next(axis.get_title() for axis in figure.axes if axis.get_title())
@@ -70,11 +75,12 @@ class ExploratoryDataAnalysisPageTests(unittest.TestCase):
     def setUpClass(cls):
         cls.raw, cls.prepared, cls.canonical = load_eda_sources()
 
-    def build(self, title: str) -> Figure:
+    def build(self, title: str) -> Figure | go.Figure:
         for visualizations in EDA_VISUALIZATIONS.values():
             if title in visualizations:
                 figure = visualizations[title](self.raw, self.prepared, self.canonical)
-                self.addCleanup(plt.close, figure)
+                if isinstance(figure, Figure):
+                    self.addCleanup(plt.close, figure)
                 return figure
         self.fail(f"Unknown visualization: {title}")
 
@@ -122,16 +128,24 @@ class ExploratoryDataAnalysisPageTests(unittest.TestCase):
             np.isfinite(statistics.drop(columns="Feature").to_numpy(dtype=float)).all()
         )
 
-    def test_every_builder_returns_a_large_matplotlib_figure_with_report_title(self):
+    def test_every_builder_returns_a_supported_figure_with_report_title(self):
         protected = (RAW_PATH, CURRENT_PREPARED_PATH, CANONICAL_PATH)
         before = {path: sha256(path) for path in protected}
+        static_titles = {
+            "Listing Price Distribution by Property Type",
+            "Property Size vs Listing Price",
+            "Listing Price Distribution by Land Title",
+            "Condominium Price Density by Parking Allocation",
+        }
         for category, visualizations in EDA_VISUALIZATIONS.items():
             for chart_name, builder in visualizations.items():
                 with self.subTest(category=category, chart=chart_name):
                     figure = builder(self.raw, self.prepared, self.canonical)
                     try:
-                        self.assertIsInstance(figure, Figure)
-                        self.assertGreaterEqual(figure.get_figwidth(), 9)
+                        expected_type = Figure if chart_name in static_titles else go.Figure
+                        self.assertIsInstance(figure, expected_type)
+                        if isinstance(figure, Figure):
+                            self.assertGreaterEqual(figure.get_figwidth(), 9)
                         title = displayed_title(figure)
                         if chart_name == "Property Size vs Listing Price":
                             self.assertRegex(
@@ -141,9 +155,11 @@ class ExploratoryDataAnalysisPageTests(unittest.TestCase):
                         else:
                             self.assertEqual(chart_name, title)
                     finally:
-                        plt.close(figure)
+                        if isinstance(figure, Figure):
+                            plt.close(figure)
         after = {path: sha256(path) for path in protected}
         self.assertEqual(before, after)
+        self.assertEqual(set(REPORT_TITLES), set(EDA_INSIGHTS))
 
     def test_special_report_chart_types_and_scales_are_preserved(self):
         expectations = {
@@ -169,7 +185,7 @@ class ExploratoryDataAnalysisPageTests(unittest.TestCase):
         self.assertTrue(facets._eda_metadata["kde"])
         self.assertTrue(all(axis.get_xscale() == "log" for axis in facets.axes))
         tenure = self.build("Cumulative Distribution of Listing Prices by Tenure")
-        self.assertEqual("log", tenure.axes[0].get_xscale())
+        self.assertEqual("log", tenure.layout.xaxis.type)
 
         land_title = self.build("Listing Price Distribution by Land Title")
         self.assertEqual(
@@ -224,15 +240,37 @@ class ExploratoryDataAnalysisPageTests(unittest.TestCase):
         self.assertEqual(floor_order, floor._eda_metadata["floor_order"])
         self.assertEqual(len(floor_expected), floor._eda_metadata["rows_used"])
 
-    def test_renderer_has_dropdowns_and_one_matplotlib_render_path(self):
+    def test_renderer_uses_sidebar_inputs_and_mixed_render_paths(self):
         renderer_source = inspect.getsource(render_eda_page)
-        self.assertIn('key="eda_category"', renderer_source)
-        self.assertIn('key="eda_visualization"', renderer_source)
         self.assertIn("EDA_VISUALIZATIONS[category][chart_name]", renderer_source)
-        self.assertEqual(1, renderer_source.count("st.pyplot"))
-        self.assertIn('width="stretch"', renderer_source)
-        self.assertNotIn("st.plotly_chart", renderer_source)
-        self.assertIn("plt.close(figure)", renderer_source)
+        self.assertNotIn("st.selectbox", renderer_source)
+        self.assertIn("render_eda_figure(figure)", renderer_source)
+        helper_source = inspect.getsource(render_eda_figure)
+        self.assertIn("st.plotly_chart", helper_source)
+        self.assertIn("st.pyplot", helper_source)
+        self.assertIn("plt.close(figure)", helper_source)
+
+    def test_interactive_figures_contain_only_finite_numeric_chart_values(self):
+        for visualizations in EDA_VISUALIZATIONS.values():
+            for title, builder in visualizations.items():
+                figure = builder(self.raw, self.prepared, self.canonical)
+                if not isinstance(figure, go.Figure):
+                    plt.close(figure)
+                    continue
+                with self.subTest(title=title):
+                    for trace in figure.data:
+                        for field in ("x", "y", "z"):
+                            values = getattr(trace, field, None)
+                            if values is None:
+                                continue
+                            numeric = np.asarray(values)
+                            if np.issubdtype(numeric.dtype, np.number):
+                                self.assertTrue(np.isfinite(numeric.astype(float)).all())
+                            elif field == "z":
+                                for value in numeric.ravel():
+                                    self.assertTrue(
+                                        value is None or np.isfinite(float(value))
+                                    )
 
     def test_no_old_prepared_dependency_or_mutating_code_path_exists(self):
         module_source = inspect.getsource(eda_page).replace("\\", "/")

@@ -39,7 +39,7 @@ from src.models.final.trimmed_market import (
     fit_trimmed_market_model,
     get_trim_market_metadata,
 )
-from prototype.eda_page import render_eda_page
+from prototype.eda_page import EDA_VISUALIZATIONS, render_eda_page
 
 
 DATA_PATH = PROJECT_ROOT / "data" / "processed" / "enhanced_city_dataset.csv"
@@ -62,13 +62,19 @@ TUNING_SEARCH_PATHS = {
     "Gradient Boosting": PROJECT_ROOT / "archive" / "legacy_scripts" / "model_tuning" / "src__models__gradient_boosting__tuning.py",
 }
 MARKET_SCOPE_OPTIONS = tuple(f"{level:g}%" for level in SUPPORTED_TRIM_LEVELS)
+OVERVIEW_VIEW = "\U0001f3e0 Overview"
+EDA_VIEW = "\U0001f4ca Data & EDA"
+EVALUATION_VIEW = "\U0001f4c8 Model Evaluation"
+DIAGNOSTICS_VIEW = "\U0001f50d Model Diagnostics"
+OUTLIER_VIEW = "\U0001f9ea Outlier Study"
+PREDICTOR_VIEW = "\U0001f3e1 Price Predictor"
 VIEWS = (
-    "Model Comparison",
-    "Exploratory Data Analysis",
-    "Feature Importance",
-    "Actual vs Predicted",
-    "Outlier & Trimming Analysis",
-    "Live House Price Predictor",
+    OVERVIEW_VIEW,
+    EDA_VIEW,
+    EVALUATION_VIEW,
+    DIAGNOSTICS_VIEW,
+    OUTLIER_VIEW,
+    PREDICTOR_VIEW,
 )
 FURNISHING_STATUS_VALUES = {"Unfurnished": 0, "Furnished": 1}
 RENOVATION_STATUS_VALUES = {"Not Renovated": 0, "Renovated": 1}
@@ -532,6 +538,79 @@ def comparison_frame(payload: dict) -> pd.DataFrame:
     return frame.set_index("Model").loc[list(FINAL_MODELS)].reset_index()
 
 
+def render_overview(data: pd.DataFrame) -> None:
+    """Orient users to the project without disclosing later analytical conclusions."""
+    st.header("Malaysian Residential Property Price Prediction")
+    st.write(
+        "A machine-learning project for estimating residential property listing prices "
+        "across Malaysia using structural, location, classification and amenity information."
+    )
+
+    st.write("### Project at a Glance")
+    headline = st.columns(4)
+    headline[0].metric("Prepared Listings", f"{len(data):,}")
+    headline[1].metric("Prepared Features", f"{data.shape[1]:,}")
+    headline[2].metric("Problem Type", "Regression")
+    headline[3].metric("Target Variable", "Listing Price (RM)")
+
+    st.write("### Project Objective")
+    st.write(
+        "Develop and evaluate multiple machine-learning models to estimate Malaysian "
+        "residential property listing prices using available property characteristics."
+    )
+    st.write(
+        "The prototype allows users to explore the dataset, compare models, investigate "
+        "prediction behaviour and generate an estimated listing price for a property."
+    )
+
+    st.write("### What Does the Dataset Contain?")
+    feature_groups = st.columns(4)
+    for column, title, features in zip(
+        feature_groups,
+        ("Property Details", "Location", "Classification", "Amenities"),
+        (
+            ("Property Size", "Bedrooms", "Bathrooms", "Parking", "Completion Year"),
+            ("State", "City / Locality", "Building", "Developer"),
+            ("Property Type", "Tenure", "Land Title", "Floor Range"),
+            ("Schools", "Malls", "Hospitals", "Transport", "Property Facilities"),
+        ),
+    ):
+        column.markdown(f"#### {title}")
+        column.markdown("\n".join(f"- {feature}" for feature in features))
+
+    st.write("### Project Workflow")
+    workflow = st.columns(5)
+    for column, number, title, description in zip(
+        workflow,
+        ("01", "02", "03", "04", "05"),
+        ("Data Understanding", "Data Preparation", "Modelling", "Evaluation", "Deployment"),
+        (
+            "Inspect property listings and identify useful variables.",
+            "Clean, transform and prepare modelling features.",
+            "Train and tune multiple regression algorithms.",
+            "Compare predictive performance and model behaviour.",
+            "Integrate the trained approach into an interactive Streamlit prototype.",
+        ),
+    ):
+        column.caption(number)
+        column.markdown(f"**{title}**")
+        column.write(description)
+
+    st.write("### Explore the Project")
+    destinations = (
+        ("📊 Data & EDA", "Explore patterns, distributions and relationships in the prepared dataset."),
+        ("📈 Model Evaluation", "Compare the predictive performance of the regression models."),
+        ("🔍 Model Diagnostics", "Inspect feature importance and actual-versus-predicted behaviour."),
+        ("🧪 Outlier Study", "Investigate the effect of premium listings and trimming experiments."),
+        ("🏡 Price Predictor", "Enter property information and generate an estimated listing price."),
+    )
+    first_row = st.columns(3)
+    second_row = st.columns(2)
+    for column, (title, description) in zip((*first_row, *second_row), destinations):
+        column.markdown(f"#### {title}")
+        column.write(description)
+
+
 def comparison_display_frame(payload: dict) -> pd.DataFrame:
     return comparison_frame(payload).rename(
         columns={
@@ -762,22 +841,103 @@ def render_scope_comparison_v2() -> None:
     )
 
 
-def render_feature_importance() -> None:
-    st.subheader("Feature Importance")
-    importance = load_feature_importance()
-    selected = st.selectbox(
-        "Select Model",
-        list(FINAL_MODELS),
-        index=list(FINAL_MODELS).index(FINAL_MODEL_NAME),
-        key="importance_model",
+def render_model_evaluation(selected_scope: str, selected_metric: str) -> None:
+    """Render selected-scope metrics, comparison, and tabbed supporting evidence."""
+    st.header("Model Evaluation")
+    st.caption("Which model performs best for the selected experimental market scope?")
+    summary = load_all_models_trimming_summary()
+    rows = scope_comparison_frame(summary, selected_scope)
+    recommended = recommended_model_for_scope(summary, selected_scope)
+    recommended_row = rows.set_index("Model").loc[recommended]
+
+    st.write("### Recommended Model for Selected Scope")
+    st.success(f"{recommended}  |  {selected_scope} market scope")
+    cards = st.columns(3)
+    cards[0].metric("RMSE", f"RM {recommended_row['RMSE_RM']:,.0f}")
+    cards[1].metric("MAE", f"RM {recommended_row['MAE_RM']:,.0f}")
+    cards[2].metric("R\u00b2", f"{recommended_row['R2']:.4f}")
+    st.plotly_chart(
+        build_official_metric_chart(rows, selected_metric),
+        width="stretch",
     )
+
+    performance_tab, tuning_tab = st.tabs(
+        ["Performance Details", "Hyperparameter Tuning"]
+    )
+    with performance_tab:
+        r2_label = "R\u00b2"
+        adjusted_label = "Adjusted R\u00b2"
+        display = rows.rename(
+            columns={
+                "Retained_Rows": "Retained Listings",
+                "RMSE_RM": "RMSE",
+                "MAE_RM": "MAE",
+                "R2": r2_label,
+                "Adjusted_R2": adjusted_label,
+            }
+        ).loc[
+            :, ["Model", "Retained Listings", "RMSE", "MAE", r2_label, adjusted_label]
+        ]
+        styled = (
+            display.style.format(
+                {
+                    "Retained Listings": "{:,}",
+                    "RMSE": "RM {:,.0f}",
+                    "MAE": "RM {:,.0f}",
+                    r2_label: "{:.4f}",
+                    adjusted_label: "{:.4f}",
+                }
+            )
+            .highlight_min(subset=["RMSE", "MAE"], color="#d1fae5")
+            .highlight_max(subset=[r2_label, adjusted_label], color="#d1fae5")
+        )
+        st.dataframe(styled, width="stretch", hide_index=True)
+
+    with tuning_tab:
+        selected_model = st.selectbox(
+            "Model for Hyperparameter Details",
+            list(FINAL_MODELS),
+            index=list(FINAL_MODELS).index(FINAL_MODEL_NAME),
+            key="tuning_model",
+        )
+        tuning = load_tuning_details()[selected_model]
+        st.write("#### Hyperparameter Search Space")
+        if tuning["search_space"].empty:
+            st.info(
+                "No formal search-space artifact is saved for this model. The fixed "
+                "final configuration is shown without claiming a tuning search."
+            )
+        else:
+            st.dataframe(tuning["search_space"], width="stretch", hide_index=True)
+        st.write("#### Selected / Final Hyperparameters")
+        st.dataframe(tuning["final_parameters"], width="stretch", hide_index=True)
+        st.write("#### Tuning Method")
+        st.write(tuning["method"])
+        st.write("#### Validation Method")
+        st.write(tuning["validation"])
+        st.caption(
+            "No before-versus-after table is shown because no comparable baseline and "
+            "tuned metrics exist for the same population and validation split."
+        )
+
+
+def render_feature_importance(
+    selected: str = FINAL_MODEL_NAME,
+    top_n: int = 10,
+) -> None:
+    st.write("### Feature Importance")
+    importance = load_feature_importance()
+    if selected not in FINAL_MODELS:
+        raise ValueError(f"Unknown feature-importance model: {selected}")
+    if top_n not in {10, 15, 20}:
+        raise ValueError("Top Features must be one of: 10, 15, 20.")
     rows = importance[importance["Model"] == selected]
     importance_type = rows["Importance_Type"].iloc[0]
-    top = rows.nlargest(20, "Importance").sort_values("Importance")
+    top = rows.nlargest(top_n, "Importance").sort_values("Importance")
     title = (
-        f"Top 20 Features — {selected}"
+        f"Top {top_n} Features — {selected}"
         if selected != "Ridge Regression"
-        else "Top 20 Absolute Coefficient Magnitudes — Ridge Regression"
+        else f"Top {top_n} Absolute Coefficient Magnitudes — Ridge Regression"
     )
     figure = px.bar(
         top,
@@ -788,37 +948,30 @@ def render_feature_importance() -> None:
         color_continuous_scale="Viridis",
         title=title,
     )
-    figure.update_layout(height=650, coloraxis_showscale=False)
+    figure.update_layout(height=max(380, 28 * top_n + 120), coloraxis_showscale=False)
     st.plotly_chart(figure, width="stretch")
     st.caption(f"Measure shown: {importance_type}.")
     if selected == FINAL_MODEL_NAME:
         position_rows = rows[rows["Raw_Feature"].isin(POSITION_FEATURES)].copy()
         if len(position_rows) != len(POSITION_FEATURES):
             raise AssertionError("Saved final-model importance is missing position features.")
-        st.write("#### Position features used by the final model")
-        st.dataframe(
-            position_rows[["Feature", "Importance"]].sort_values(
-                "Importance", ascending=False
-            ),
-            width="stretch",
-            hide_index=True,
-        )
+        with st.expander("Position Features Used by the Final Model"):
+            st.dataframe(
+                position_rows[["Feature", "Importance"]].sort_values(
+                    "Importance", ascending=False
+                ),
+                width="stretch",
+                hide_index=True,
+            )
 
 
-def render_actual_vs_predicted(payload: dict) -> None:
-    st.subheader("Actual vs Scenario B OOF Predicted Price")
-    selected = st.selectbox(
-        "Select Model to Visualize",
-        list(FINAL_MODELS),
-        index=list(FINAL_MODELS).index(FINAL_MODEL_NAME),
-        key="prediction_model",
-    )
-    selected_trim = st.selectbox(
-        "Select Trimming Level",
-        list(MARKET_SCOPE_OPTIONS),
-        index=list(MARKET_SCOPE_OPTIONS).index("10%"),
-        key="prediction_trim_level",
-    )
+def render_actual_vs_predicted(
+    payload: dict,
+    selected: str = FINAL_MODEL_NAME,
+    selected_trim: str = "10%",
+) -> None:
+    st.write(f"### Actual vs Predicted \u2014 {selected}")
+    st.caption("Scenario B saved out-of-fold predictions")
     try:
         summary = load_all_models_trimming_summary()
         scope_rows = scope_comparison_frame(summary, selected_trim).set_index("Model")
@@ -840,17 +993,6 @@ def render_actual_vs_predicted(payload: dict) -> None:
     cards[1].metric("MAE", f"RM {metrics['MAE_RM']:,.0f}")
     cards[2].metric("R²", f"{metrics['R2']:.4f}")
 
-    scope_cards = st.columns(5)
-    scope_cards[0].metric("Original Listings", f"{metadata['original_rows']:,}")
-    scope_cards[1].metric("Retained Listings", f"{metadata['retained_rows']:,}")
-    scope_cards[2].metric("Removed Listings", f"{metadata['removed_rows']:,}")
-    scope_cards[3].metric(
-        "Retention Percentage", f"{metadata['retention_percentage']:.2f}%"
-    )
-    scope_cards[4].metric(
-        "Maximum Retained Actual Price",
-        f"RM {metadata['maximum_retained_price_RM']:,.0f}",
-    )
     figure = px.scatter(
         plot,
         x="Actual Price (RM)",
@@ -883,6 +1025,31 @@ def render_actual_vs_predicted(payload: dict) -> None:
         f"{selected_trim} upper-tail trimming is applied using actual listing price. "
         f"Displayed listings: {len(plot):,}."
     )
+    with st.expander("Market Scope Details"):
+        scope_details = pd.DataFrame(
+            {
+                "Original Listings": [metadata["original_rows"]],
+                "Retained Listings": [metadata["retained_rows"]],
+                "Removed Listings": [metadata["removed_rows"]],
+                "Retention Percentage": [metadata["retention_percentage"]],
+                "Maximum Retained Actual Price": [
+                    metadata["maximum_retained_price_RM"]
+                ],
+            }
+        )
+        st.dataframe(
+            scope_details.style.format(
+                {
+                    "Original Listings": "{:,}",
+                    "Retained Listings": "{:,}",
+                    "Removed Listings": "{:,}",
+                    "Retention Percentage": "{:.2f}%",
+                    "Maximum Retained Actual Price": "RM {:,.0f}",
+                }
+            ),
+            width="stretch",
+            hide_index=True,
+        )
 
 
 def actual_vs_predicted_plot_frame(
@@ -938,6 +1105,49 @@ def actual_vs_predicted_plot_frame(
         }
     )
     return plot, metadata
+
+
+def render_model_diagnostics(payload: dict) -> None:
+    """Combine feature importance and saved OOF diagnostics under one page."""
+    st.header("Model Diagnostics")
+    st.caption("How is the model behaving?")
+    diagnostic_view = st.radio(
+        "Diagnostic View",
+        ["Feature Importance", "Actual vs Predicted"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="diagnostic_view",
+    )
+    if diagnostic_view == "Feature Importance":
+        st.sidebar.write("### FEATURE IMPORTANCE")
+        model_name = st.sidebar.selectbox(
+            "Model",
+            list(FINAL_MODELS),
+            index=list(FINAL_MODELS).index(FINAL_MODEL_NAME),
+            key="importance_model",
+        )
+        top_n = st.sidebar.selectbox(
+            "Top Features",
+            [10, 15, 20],
+            index=0,
+            key="importance_top_n",
+        )
+        render_feature_importance(model_name, int(top_n))
+    else:
+        st.sidebar.write("### ACTUAL VS PREDICTED")
+        model_name = st.sidebar.selectbox(
+            "Model",
+            list(FINAL_MODELS),
+            index=list(FINAL_MODELS).index(FINAL_MODEL_NAME),
+            key="prediction_model",
+        )
+        selected_scope = st.sidebar.selectbox(
+            "Market Scope",
+            list(MARKET_SCOPE_OPTIONS),
+            index=list(MARKET_SCOPE_OPTIONS).index("10%"),
+            key="prediction_trim_level",
+        )
+        render_actual_vs_predicted(payload, model_name, selected_scope)
 
 
 def trim_label(value: float) -> str:
@@ -1021,32 +1231,36 @@ def build_trimmed_metric_chart(summary: pd.DataFrame, metric_name: str) -> go.Fi
 
 
 def render_outlier_trimming() -> None:
-    st.subheader("Outlier & Trimming Analysis")
-    st.caption(
-        "Evaluating whether removing high-priced properties improves model generalization"
+    st.header("Outlier & Trimming Study")
+    st.success("Final Full-Market Decision: 0% Upper-Tail Trimming")
+    st.markdown(
+        "- ✓ Invalid and impossible observations are removed.\n"
+        "- ✓ Duplicate records are removed.\n"
+        "- ✓ Valid premium listings are retained.\n"
+        "- ✓ Training-only trimming worsened premium prediction.\n"
+        "- ✓ Restricted-market trimming remains an experiment.\n"
+        "- ✓ Final full-market modelling retains valid premium observations."
     )
-    st.write(
-        "Upper-tail trimming was evaluated at 0%, 0.5%, 1%, 2.5%, 5%, and "
-        "10%. The experiment compared training-only trimming against "
-        "trimmed-population evaluation. The final model retains 0% trimming "
-        "because removing premium training observations worsened generalization "
-        "to the complete housing market."
+    st.info(
+        "The 10% default used by interactive tools is an experimental restricted-market "
+        "scope. It does not replace the official 0% full-market strategy."
     )
 
     metadata, tables = load_trimming_results()
     training = tables["training_only_comparison"]
     distribution = tables["distribution_shift"]
-    retained_cv = tables["retained_cv_summary"]
     bootstrap = tables["bootstrap_results"]
-    levels = metadata["trim_levels_percent"]
-    labels = [trim_label(float(value)) for value in levels]
     production_training = training[training["Model"] == FINAL_MODEL_NAME].copy()
     baseline_distribution = distribution.loc[
         distribution["Removal_Percent"].eq(0.0)
     ].iloc[0]
 
-    st.write("### Outlier Detection")
-    st.info(
+    detection_tab, experiment_tab, statistics_tab = st.tabs(
+        ["Outlier Detection", "Trimming Experiment", "Statistical Evidence"]
+    )
+
+    detection_tab.write("### Outlier Detection")
+    detection_tab.info(
         "An extreme listing price is not automatically invalid. Canonical cleaning "
         "removes impossible values and listings outside the established RM50–RM5,000 "
         "PPSF plausibility range; valid premium observations remain eligible."
@@ -1075,7 +1289,7 @@ def render_outlier_trimming() -> None:
             ],
         }
     )
-    st.dataframe(detection, width="stretch", hide_index=True)
+    detection_tab.dataframe(detection, width="stretch", hide_index=True)
     price_landmarks = pd.DataFrame(
         {
             "Price Landmark": ["Median", "P90", "P95", "P99", "Maximum"],
@@ -1099,9 +1313,9 @@ def render_outlier_trimming() -> None:
     detection_chart.update_traces(marker_color="#64748b")
     detection_chart.update_layout(height=390, showlegend=False)
     detection_chart.update_yaxes(tickformat=",")
-    st.plotly_chart(detection_chart, width="stretch")
+    detection_tab.plotly_chart(detection_chart, width="stretch")
 
-    st.write("### Outlier Treatment Methods")
+    detection_tab.write("### Outlier Treatment Methods")
     methods = pd.DataFrame(
         [
             {
@@ -1160,49 +1374,10 @@ def render_outlier_trimming() -> None:
             },
         ]
     )
-    st.dataframe(methods, width="stretch", hide_index=True)
+    with detection_tab.expander("View Outlier Treatment Methods"):
+        st.dataframe(methods, width="stretch", hide_index=True)
 
-    st.write("### Market Scope After Trimming")
-    market_scope = pd.DataFrame(
-        {
-            "Trim Level": distribution["Removal_Percent"].map(trim_label),
-            "Rows Removed": (
-                distribution["Before_Row_Count"] - distribution["After_Row_Count"]
-            ).astype(int),
-            "Retention %": (
-                100 * distribution["After_Row_Count"] / distribution["Before_Row_Count"]
-            ),
-            "Maximum Retained Price": distribution["After_Maximum_Price_RM"],
-            "Mean Retained Price": distribution["After_Mean_Price_RM"],
-            "Price Skewness": distribution["After_Skewness"],
-        }
-    )
-    scope_chart = px.line(
-        market_scope,
-        x="Trim Level",
-        y="Maximum Retained Price",
-        markers=True,
-        title="Maximum Retained Price Across Trim Levels",
-    )
-    scope_chart.update_traces(line_color="#2563eb", marker_size=8)
-    scope_chart.update_layout(height=390, showlegend=False)
-    scope_chart.update_yaxes(rangemode="tozero", tickformat=",")
-    st.plotly_chart(scope_chart, width="stretch")
-    st.dataframe(
-        market_scope.style.format(
-            {
-                "Rows Removed": "{:,}",
-                "Retention %": "{:.1f}%",
-                "Maximum Retained Price": "RM {:,.0f}",
-                "Mean Retained Price": "RM {:,.0f}",
-                "Price Skewness": "{:.2f}",
-            }
-        ),
-        width="stretch",
-        hide_index=True,
-    )
-
-    st.write("### Premium Property Impact")
+    experiment_tab.write("### Premium Property Impact")
     premium_impact = production_training[
         [
             "Removal_Percent",
@@ -1230,122 +1405,27 @@ def render_outlier_trimming() -> None:
     )
     premium_chart.update_traces(line_color="#dc2626", marker_size=8)
     premium_chart.update_layout(height=390, showlegend=False)
-    st.plotly_chart(premium_chart, width="stretch")
-    st.dataframe(
-        premium_impact.style.format(
-            {
-                "Top-5% RMSE": "RM {:,.0f}",
-                "95–99% RMSE": "RM {:,.0f}",
-                "99–100% RMSE": "RM {:,.0f}",
-                "Premium Underprediction %": "{:.1f}%",
-            }
-        ),
-        width="stretch",
-        hide_index=True,
+    experiment_tab.plotly_chart(premium_chart, width="stretch")
+    experiment_tab.warning(
+        "As progressively more high-priced training examples are removed, the model "
+        "becomes less capable of predicting premium properties and premium "
+        "underprediction increases."
     )
-    st.write(
-        "Premium underprediction increases as more upper-tail examples are removed "
-        "from training."
-    )
+    with experiment_tab.expander("View Detailed Premium-Segment Results"):
+        st.dataframe(
+            premium_impact.style.format(
+                {
+                    "Top-5% RMSE": "RM {:,.0f}",
+                    "95–99% RMSE": "RM {:,.0f}",
+                    "99–100% RMSE": "RM {:,.0f}",
+                    "Premium Underprediction %": "{:.1f}%",
+                }
+            ),
+            width="stretch",
+            hide_index=True,
+        )
 
-    selected_label = st.selectbox(
-        "Retained-population trim level",
-        labels,
-        index=0,
-        key="trim_level",
-    )
-
-    st.write("### Retained Data Training & Validation")
-    st.write(
-        "In the restricted-market experiment, properties above the selected trimming "
-        "threshold are excluded first. The remaining listings are then evaluated "
-        "using the same group-safe five-fold cross-validation approach. Therefore, "
-        "each retained listing is used for training in four folds and validation once."
-    )
-    st.info(
-        "The retained listings are evaluated using five-fold group-safe "
-        "cross-validation. In each fold, approximately 80% of the retained listings "
-        "are used for training and 20% for validation. Every retained listing is "
-        "validated exactly once."
-    )
-    selected_cv = retained_cv[retained_cv["trim_level"].eq(selected_label)].copy()
-    if len(selected_cv) != 5:
-        raise ValueError(f"Retained-CV summary is incomplete for {selected_label}.")
-    original_rows = int(selected_cv["original_rows"].iloc[0])
-    retained_rows = int(selected_cv["retained_rows"].iloc[0])
-    removed_rows = int(selected_cv["removed_rows"].iloc[0])
-    retention = float(selected_cv["retention_percentage"].iloc[0])
-    average_training = float(selected_cv["training_rows"].mean())
-    average_validation = float(selected_cv["validation_rows"].mean())
-
-    retained_cards = st.columns(4)
-    retained_cards[0].metric("Original Listings", f"{original_rows:,}")
-    retained_cards[1].metric("Listings Removed", f"{removed_rows:,}")
-    retained_cards[2].metric("Listings Retained", f"{retained_rows:,}")
-    retained_cards[3].metric("Retention", f"{retention:.2f}%")
-    fold_share_cards = st.columns(2)
-    fold_share_cards[0].metric(
-        "Avg. Training per Fold",
-        f"{average_training:,.1f}",
-        f"{100 * average_training / retained_rows:.1f}% of retained listings",
-        delta_color="off",
-    )
-    fold_share_cards[1].metric(
-        "Avg. Validation per Fold",
-        f"{average_validation:,.1f}",
-        f"{100 * average_validation / retained_rows:.1f}% of retained listings",
-        delta_color="off",
-    )
-    st.caption(
-        f"3,791 original listings → apply {selected_label} trimming → "
-        f"{retained_rows:,} retained listings → Scenario B group-safe 5-fold CV → "
-        "each retained listing validated once → restricted-market RMSE and MAE."
-    )
-
-    fold_table = selected_cv[["fold", "training_rows", "validation_rows"]].rename(
-        columns={
-            "fold": "Fold",
-            "training_rows": "Training Listings",
-            "validation_rows": "Validation Listings",
-        }
-    )
-    st.dataframe(
-        fold_table.style.format(
-            {"Training Listings": "{:,}", "Validation Listings": "{:,}"}
-        ),
-        width="stretch",
-        hide_index=True,
-    )
-
-    fold_chart_data = fold_table.melt(
-        id_vars="Fold",
-        value_vars=["Training Listings", "Validation Listings"],
-        var_name="Partition",
-        value_name="Listings",
-    )
-    fold_chart = px.bar(
-        fold_chart_data,
-        x="Fold",
-        y="Listings",
-        color="Partition",
-        barmode="stack",
-        text_auto=",",
-        title=f"Training and Validation Listings by Fold — {selected_label} Trimming",
-        color_discrete_map={
-            "Training Listings": "#2563eb",
-            "Validation Listings": "#d97706",
-        },
-    )
-    fold_chart.update_layout(height=420, legend_title_text="")
-    fold_chart.update_xaxes(tickvals=list(range(1, 6)), title="Scenario B Fold")
-    fold_chart.update_yaxes(rangemode="tozero", tickformat=",")
-    st.plotly_chart(fold_chart, width="stretch")
-    st.caption(
-        "Each stacked bar is one CV run: that fold is validation/test data and the "
-        "other four retained folds are training data."
-    )
-
-    st.write("### Statistical Validation")
+    statistics_tab.write("### Statistical Validation")
     statistical = bootstrap.loc[
         bootstrap["Model"].eq(FINAL_MODEL_NAME),
         [
@@ -1382,37 +1462,28 @@ def render_outlier_trimming() -> None:
             "MAE_CI95_Upper_RM": "MAE CI95 Upper",
         }
     ).drop(columns="Removal_Percent")
-    st.dataframe(
-        statistical.style.format(
-            {
-                "RMSE Change": "RM {:,.0f}",
-                "RMSE CI95 Lower": "RM {:,.0f}",
-                "RMSE CI95 Upper": "RM {:,.0f}",
-                "MAE Change": "RM {:,.0f}",
-                "MAE CI95 Lower": "RM {:,.0f}",
-                "MAE CI95 Upper": "RM {:,.0f}",
-            }
-        ),
-        width="stretch",
-        hide_index=True,
-    )
-    st.caption(
+    statistics_tab.write(
+        "The saved bootstrap comparison uses 0% trimming as its baseline. "
         "Positive changes mean trimming performed worse than the 0% baseline. "
         "A confidence interval entirely above zero indicates reliable deterioration."
     )
+    with statistics_tab.expander("View Bootstrap Statistical Results"):
+        st.dataframe(
+            statistical.style.format(
+                {
+                    "RMSE Change": "RM {:,.0f}",
+                    "RMSE CI95 Lower": "RM {:,.0f}",
+                    "RMSE CI95 Upper": "RM {:,.0f}",
+                    "MAE Change": "RM {:,.0f}",
+                    "MAE CI95 Lower": "RM {:,.0f}",
+                    "MAE CI95 Upper": "RM {:,.0f}",
+                }
+            ),
+            width="stretch",
+            hide_index=True,
+        )
 
-    st.write("### Final Outlier-Treatment Decision")
-    st.success("Final Decision: 0% Trimming")
-    st.write(
-        "Valid premium observations remain in training. Aggressive training-only "
-        "trimming worsens full-market prediction, while restricted-market errors fall "
-        "partly because the evaluation market becomes easier. Only genuinely invalid "
-        "or duplicated listings are removed; existing feature engineering is preferred "
-        "over deleting legitimate premium examples."
-    )
-    st.info(f"Final Production Model: {FINAL_MODEL_NAME}")
-
-    with st.expander("Technical Details", expanded=False):
+    with statistics_tab.expander("Technical Details", expanded=False):
         st.write(f"Canonical rows: {metadata['canonical_rows']:,}")
         st.write(f"Validation: {metadata['validation_method']}")
         st.write(f"Target: {metadata['target']}")
@@ -1699,47 +1770,25 @@ def render_live_predictor(data: pd.DataFrame) -> None:
             )
 
 
-def render_scope_predictor(data: pd.DataFrame) -> None:
+def render_scope_predictor(data: pd.DataFrame, selected_scope: str = "10%") -> None:
     """Render four-model live inference for a selected saved market scope."""
-    st.subheader("Live House Price Predictor")
-    selected_scope = st.selectbox(
-        "Select Market Scope",
-        list(MARKET_SCOPE_OPTIONS),
-        index=5,
-        key="predictor_market_scope",
-    )
-    scope_level = float(selected_scope.removesuffix("%"))
-    metadata = get_trim_market_metadata(scope_level)
-    scope_metrics = st.columns(4)
-    scope_metrics[0].metric("Model Scope", selected_scope)
-    scope_metrics[1].metric("Training Listings", f"{metadata['retained_rows']:,}")
-    scope_metrics[2].metric("Listings Excluded", f"{metadata['removed_rows']:,}")
-    scope_metrics[3].metric("Retention", f"{metadata['retention_percentage']:.2f}%")
+    st.header("Price Predictor")
     st.caption(
-        "The percentage selects an already-validated training population; it is never "
-        "calculated from the live property. Full-market (0%) results remain alongside it."
+        "Estimate a listing price with the existing saved models and frozen feature pipeline."
     )
+    if selected_scope not in MARKET_SCOPE_OPTIONS:
+        raise ValueError(f"Unsupported market scope: {selected_scope}")
+    scope_level = float(selected_scope.removesuffix("%"))
     if scope_level > 0:
         st.warning(
             f"{selected_scope} scope excludes the saved upper price tail from model training. "
-            "Predictions for premium properties outside that retained market may be less reliable."
+            "It is experimental; the official full-market strategy remains 0%."
         )
 
-    description = st.text_area(
-        "Listing Description",
-        placeholder="Example: Spacious high floor unit with a large balcony and city views.",
-        key="listing_description",
-    )
-    detected = extract_position_features([description]).iloc[0]
-    st.write("#### Detected position features")
-    status_columns = st.columns(5)
-    for column, feature in zip(status_columns, POSITION_FEATURES):
-        mark = "✓" if bool(detected[feature]) else "—"
-        column.caption(f"{mark} {POSITION_DISPLAY_NAMES[feature]}")
-
     with st.form("scope_prediction_form"):
-        numeric, category = st.columns(2)
-        with numeric:
+        st.write("### 1. Property Details")
+        numeric_columns = st.columns(4)
+        with numeric_columns[0]:
             property_size = st.number_input(
                 "Property Size (sq.ft.)",
                 min_value=1.0,
@@ -1751,6 +1800,7 @@ def render_scope_predictor(data: pd.DataFrame) -> None:
                 "Bedrooms", min_value=0.0, max_value=20.0,
                 value=float(data["bedroom"].median()), step=1.0,
             )
+        with numeric_columns[1]:
             bathrooms = st.number_input(
                 "Bathrooms", min_value=0.0, max_value=20.0,
                 value=float(data["bathroom"].median()), step=1.0,
@@ -1759,6 +1809,7 @@ def render_scope_predictor(data: pd.DataFrame) -> None:
                 "Parking Lots", min_value=0.0, max_value=20.0,
                 value=float(data["parking_lot"].median()), step=1.0,
             )
+        with numeric_columns[2]:
             facilities_count = st.number_input(
                 "Facilities Count", min_value=0, max_value=50,
                 value=int(data["facilities_count"].median()), step=1,
@@ -1767,6 +1818,7 @@ def render_scope_predictor(data: pd.DataFrame) -> None:
                 "Completion Year", min_value=1800, max_value=2030,
                 value=int(data["completion_year"].median()), step=1,
             )
+        with numeric_columns[3]:
             number_of_floors = st.number_input(
                 "Number of Floors", min_value=1, max_value=200,
                 value=max(1, int(data["number_of_floors"].median())), step=1,
@@ -1775,16 +1827,21 @@ def render_scope_predictor(data: pd.DataFrame) -> None:
                 "Total Units", min_value=1, max_value=20_000,
                 value=max(1, int(data["total_units"].median())), step=1,
             )
-        with category:
+
+        st.write("### 2. Location & Classification")
+        classification_columns = st.columns(2)
+        with classification_columns[0]:
             property_type = st.selectbox("Property Type", category_values(data, "property_type"))
             tenure_type = st.selectbox("Tenure Type", category_values(data, "tenure_type"))
             land_title = st.selectbox("Land Title", category_values(data, "land_title"))
             floor_range = st.selectbox("Floor Range", category_values(data, "floor_range"))
+        with classification_columns[1]:
             state = st.selectbox("State", category_values(data, "state"))
             city = st.selectbox("City / Locality", category_values(data, "city"))
             building_name = st.text_input("Building Name (Optional)", value="")
             developer = st.text_input("Developer (Optional)", value="")
 
+        st.write("### 3. Amenities & Property Condition")
         st.write("#### Nearby Amenities")
         nearby = st.columns(4)
         has_school = int(nearby[0].checkbox("School"))
@@ -1810,7 +1867,21 @@ def render_scope_predictor(data: pd.DataFrame) -> None:
         renovation_status = conditions[1].selectbox(
             "Renovation Status", list(RENOVATION_STATUS_VALUES), index=0
         )
-        submitted = st.form_submit_button("Estimate Price", type="primary")
+
+        st.write("### 4. Listing Description / Position Signals")
+        description = st.text_area(
+            "Listing Description",
+            placeholder="Example: Spacious high floor unit with a large balcony and city views.",
+            key="listing_description",
+        )
+        submitted = st.form_submit_button("Estimate Property Price", type="primary")
+
+    detected = extract_position_features([description]).iloc[0]
+    st.caption("Detected position signals from the listing description")
+    status_columns = st.columns(5)
+    for column, feature in zip(status_columns, POSITION_FEATURES):
+        mark = "✓" if bool(detected[feature]) else "—"
+        column.caption(f"{mark} {POSITION_DISPLAY_NAMES[feature]}")
 
     if not submitted:
         return
@@ -1885,23 +1956,35 @@ def render_scope_predictor(data: pd.DataFrame) -> None:
         st.error(str(error))
         return
 
-    st.write("#### Four-Model Price Comparison")
-    styled = output.style.format(
-        {
-            "Selected-Scope Prediction": "RM {:,.0f}",
-            "Full-Market Prediction": "RM {:,.0f}",
-            "Difference (RM)": "RM {:+,.0f}",
-            "Difference (%)": "{:+.2f}%",
-        }
+    final_prediction = selected_predictions[FINAL_MODEL_NAME]
+    st.write("### Estimated Listing Price")
+    result_columns = st.columns(3)
+    result_columns[0].metric(
+        "Estimated Price", f"RM {final_prediction['total_price_RM']:,.0f}"
     )
-    st.dataframe(styled, width="stretch", hide_index=True)
+    result_columns[1].metric(
+        "Estimated PPSF", f"RM {final_prediction['ppsf_RM']:,.0f}"
+    )
+    result_columns[2].metric("Market Scope", selected_scope)
+    st.caption(f"Model: {FINAL_MODEL_NAME} · Saved deployment artifact")
+
     recommendation = recommended_model_for_scope(
         load_all_models_trimming_summary(), selected_scope
     )
-    st.success(
+    st.info(
         f"Recommended Model for {selected_scope} scope: {recommendation} "
         "(lowest saved validation RMSE)."
     )
+    with st.expander("Compare Predictions from All Models"):
+        styled = output.style.format(
+            {
+                "Selected-Scope Prediction": "RM {:,.0f}",
+                "Full-Market Prediction": "RM {:,.0f}",
+                "Difference (RM)": "RM {:+,.0f}",
+                "Difference (%)": "{:+.2f}%",
+            }
+        )
+        st.dataframe(styled, width="stretch", hide_index=True)
     if selected_scope == "0%":
         st.caption(
             "The selected scope is the full market, so both prediction columns use the "
@@ -1914,29 +1997,79 @@ def render_scope_predictor(data: pd.DataFrame) -> None:
 
 def main() -> None:
     st.set_page_config(
-        page_title="Real Estate Price Prediction Dashboard",
-        page_icon="🏠",
+        page_title="Malaysian Property Price ML",
+        page_icon="\U0001f3e0",
         layout="wide",
     )
-    st.title("Real Estate Price Prediction Dashboard")
-    payload = load_comparison()
-    data = load_dataset()
-    st.sidebar.title("Navigation")
-    view = st.sidebar.radio("Select View", list(VIEWS), key="navigation")
-    if view not in {"Model Comparison", "Exploratory Data Analysis"}:
-        st.caption("Scenario B leakage-safe group cross-validation")
-    if view == "Model Comparison":
-        render_scope_comparison_v2()
-    elif view == "Exploratory Data Analysis":
-        render_eda_page()
-    elif view == "Feature Importance":
-        render_feature_importance()
-    elif view == "Actual vs Predicted":
-        render_actual_vs_predicted(payload)
-    elif view == "Outlier & Trimming Analysis":
+    st.sidebar.title("Property Price ML")
+    st.sidebar.caption("Malaysian Residential Property Price Prediction")
+    st.sidebar.write("### NAVIGATION")
+    view = st.sidebar.radio(
+        "Navigation",
+        list(VIEWS),
+        key="navigation",
+        label_visibility="collapsed",
+    )
+
+    if view == OVERVIEW_VIEW:
+        render_overview(load_dataset())
+    elif view == EDA_VIEW:
+        st.sidebar.write("### DATA EXPLORATION")
+        category = st.sidebar.selectbox(
+            "EDA Category", list(EDA_VISUALIZATIONS), key="eda_category"
+        )
+        chart_name = st.sidebar.selectbox(
+            "Visualisation",
+            list(EDA_VISUALIZATIONS[category]),
+            key="eda_visualization",
+        )
+        render_eda_page(category, chart_name)
+    elif view == EVALUATION_VIEW:
+        st.sidebar.write("### MODEL EVALUATION")
+        selected_scope = st.sidebar.selectbox(
+            "Market Scope",
+            list(MARKET_SCOPE_OPTIONS),
+            index=list(MARKET_SCOPE_OPTIONS).index("10%"),
+            key="evaluation_market_scope",
+        )
+        selected_metric = st.sidebar.selectbox(
+            "Evaluation Metric",
+            list(COMPARISON_METRICS),
+            key="model_comparison_metric",
+        )
+        st.sidebar.caption("Official full-market reporting remains at 0% trimming.")
+        render_model_evaluation(selected_scope, selected_metric)
+    elif view == DIAGNOSTICS_VIEW:
+        render_model_diagnostics(load_comparison())
+    elif view == OUTLIER_VIEW:
+        st.sidebar.write("### OUTLIER STUDY")
+        st.sidebar.info(
+            "Final strategy: 0% upper-tail trimming\n\n"
+            "Canonical market: 3,791 listings\n\n"
+            "PPSF plausibility: RM 50–RM 5,000"
+        )
         render_outlier_trimming()
-    elif view == "Live House Price Predictor":
-        render_scope_predictor(data)
+    elif view == PREDICTOR_VIEW:
+        st.sidebar.write("### PREDICTION SETTINGS")
+        selected_scope = st.sidebar.selectbox(
+            "Market Scope",
+            list(MARKET_SCOPE_OPTIONS),
+            index=list(MARKET_SCOPE_OPTIONS).index("10%"),
+            key="predictor_market_scope",
+        )
+        metadata = get_trim_market_metadata(float(selected_scope.removesuffix("%")))
+        st.sidebar.metric("Retained Market", f"{metadata['retention_percentage']:.2f}%")
+        st.sidebar.metric("Training Listings", f"{metadata['retained_rows']:,}")
+        st.sidebar.metric("Excluded", f"{metadata['removed_rows']:,}")
+        st.sidebar.caption("Official full-market reporting remains at 0% trimming.")
+        render_scope_predictor(load_dataset(), selected_scope)
+
+    st.sidebar.divider()
+    st.sidebar.write("### PROJECT")
+    st.sidebar.caption("Problem\n\nRegression")
+    st.sidebar.caption("Target\n\nListing Price")
+    st.sidebar.caption("Dataset\n\nMalaysian Residential Properties")
+    st.sidebar.caption("Validation\n\nScenario B Group-Safe CV")
 
 
 if __name__ == "__main__":
