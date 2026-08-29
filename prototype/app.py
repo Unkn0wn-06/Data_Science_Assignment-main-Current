@@ -813,25 +813,43 @@ def render_actual_vs_predicted(payload: dict) -> None:
         index=list(FINAL_MODELS).index(FINAL_MODEL_NAME),
         key="prediction_model",
     )
-    segment = st.radio(
-        "Listing Segment", ["All Listings", "Top 5%"], horizontal=True
+    selected_trim = st.selectbox(
+        "Select Trimming Level",
+        list(MARKET_SCOPE_OPTIONS),
+        index=list(MARKET_SCOPE_OPTIONS).index("10%"),
+        key="prediction_trim_level",
     )
-    metrics = comparison_frame(payload).set_index("Model").loc[selected]
+    try:
+        summary = load_all_models_trimming_summary()
+        scope_rows = scope_comparison_frame(summary, selected_trim).set_index("Model")
+        if selected not in scope_rows.index:
+            raise ValueError(
+                f"Saved trimming results do not contain {selected} at {selected_trim}."
+            )
+        metrics = scope_rows.loc[selected]
+        plot, metadata = actual_vs_predicted_plot_frame(
+            load_oof_predictions(),
+            selected,
+            float(selected_trim.removesuffix("%")),
+        )
+    except (AssertionError, KeyError, ValueError) as error:
+        st.error(str(error))
+        return
     cards = st.columns(3)
     cards[0].metric("RMSE", f"RM {metrics['RMSE_RM']:,.0f}")
     cards[1].metric("MAE", f"RM {metrics['MAE_RM']:,.0f}")
     cards[2].metric("R²", f"{metrics['R2']:.4f}")
 
-    oof = load_oof_predictions()
-    if segment == "Top 5%":
-        threshold = float(np.quantile(oof["actual_price"], 0.95))
-        oof = oof[oof["actual_price"] >= threshold].copy()
-    prediction_column = PREDICTION_COLUMNS[selected]
-    plot = oof.rename(
-        columns={
-            "actual_price": "Actual Price (RM)",
-            prediction_column: "OOF Predicted Price (RM)",
-        }
+    scope_cards = st.columns(5)
+    scope_cards[0].metric("Original Listings", f"{metadata['original_rows']:,}")
+    scope_cards[1].metric("Retained Listings", f"{metadata['retained_rows']:,}")
+    scope_cards[2].metric("Removed Listings", f"{metadata['removed_rows']:,}")
+    scope_cards[3].metric(
+        "Retention Percentage", f"{metadata['retention_percentage']:.2f}%"
+    )
+    scope_cards[4].metric(
+        "Maximum Retained Actual Price",
+        f"RM {metadata['maximum_retained_price_RM']:,.0f}",
     )
     figure = px.scatter(
         plot,
@@ -839,7 +857,10 @@ def render_actual_vs_predicted(payload: dict) -> None:
         y="OOF Predicted Price (RM)",
         hover_data=["listing_id", "scenario_b_fold"],
         opacity=0.55,
-        title=f"{selected}: Actual vs OOF Predicted Price",
+        title=(
+            f"{selected}: Actual vs OOF Predicted Price \u2014 "
+            f"{selected_trim} Trimming"
+        ),
     )
     lower = float(
         min(plot["Actual Price (RM)"].min(), plot["OOF Predicted Price (RM)"].min())
@@ -858,9 +879,65 @@ def render_actual_vs_predicted(payload: dict) -> None:
     )
     st.plotly_chart(figure, width="stretch")
     st.caption(
-        f"Every plotted row is a saved Scenario B out-of-fold prediction. "
+        "Every point is a saved Scenario B out-of-fold prediction. "
+        f"{selected_trim} upper-tail trimming is applied using actual listing price. "
         f"Displayed listings: {len(plot):,}."
     )
+
+
+def actual_vs_predicted_plot_frame(
+    oof: pd.DataFrame,
+    model_name: str,
+    trim_level: float,
+) -> tuple[pd.DataFrame, dict[str, float | int | str | None]]:
+    """Return validated saved OOF points for one authoritative market scope."""
+    if model_name not in PREDICTION_COLUMNS:
+        raise ValueError(f"Unknown model for saved OOF predictions: {model_name}")
+
+    prediction_column = PREDICTION_COLUMNS[model_name]
+    required = {"listing_id", "actual_price", "scenario_b_fold", prediction_column}
+    missing = sorted(required.difference(oof.columns))
+    if missing:
+        raise ValueError(
+            f"Saved OOF predictions for {model_name} are missing columns: {missing}"
+        )
+
+    metadata = get_trim_market_metadata(trim_level)
+    if len(oof) != metadata["original_rows"]:
+        raise ValueError(
+            f"Saved OOF predictions contain {len(oof):,} rows, but the authoritative "
+            f"trimming experiment requires {metadata['original_rows']:,}."
+        )
+
+    actual = pd.to_numeric(oof["actual_price"], errors="coerce")
+    predicted = pd.to_numeric(oof[prediction_column], errors="coerce")
+    if not (
+        np.isfinite(actual.to_numpy(float)).all()
+        and np.isfinite(predicted.to_numpy(float)).all()
+    ):
+        raise ValueError("Saved actual and OOF predicted prices must all be finite.")
+
+    retained = oof.copy()
+    retained["actual_price"] = actual
+    retained[prediction_column] = predicted
+    cutoff = metadata["cutoff_RM"]
+    if cutoff is not None:
+        retained = retained.loc[retained["actual_price"].le(float(cutoff))].copy()
+    if retained.empty:
+        raise ValueError(f"{metadata['trim_label']} trimming retained no OOF listings.")
+    if len(retained) != metadata["retained_rows"]:
+        raise ValueError(
+            f"{metadata['trim_label']} trimming retained {len(retained):,} OOF rows; "
+            f"the saved experiment requires {metadata['retained_rows']:,}."
+        )
+
+    plot = retained.rename(
+        columns={
+            "actual_price": "Actual Price (RM)",
+            prediction_column: "OOF Predicted Price (RM)",
+        }
+    )
+    return plot, metadata
 
 
 def trim_label(value: float) -> str:

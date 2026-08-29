@@ -13,9 +13,11 @@ from streamlit.testing.v1 import AppTest
 from prototype.app import (
     COMPARISON_METRICS,
     MARKET_SCOPE_OPTIONS,
+    actual_vs_predicted_plot_frame,
     build_official_metric_chart,
     condition_feature_values,
     load_all_models_trimming_summary,
+    load_oof_predictions,
     load_scope_models,
     load_tuning_details,
     normalized_scope_display_frame,
@@ -195,6 +197,101 @@ class ScopeAwareStreamlitTests(unittest.TestCase):
                 saved = rows.set_index("Model")
                 for model_name in FINAL_MODELS:
                     self.assertAlmostEqual(saved.loc[model_name, column], plotted[model_name])
+
+    def test_actual_vs_predicted_uses_saved_cutoffs_for_every_trim_level(self):
+        oof = load_oof_predictions()
+        expected_counts = {
+            "0%": 3_791,
+            "0.5%": 3_772,
+            "1%": 3_758,
+            "2.5%": 3_700,
+            "5%": 3_601,
+            "10%": 3_412,
+        }
+        for model_name in FINAL_MODELS:
+            for scope, expected_count in expected_counts.items():
+                with self.subTest(model=model_name, scope=scope):
+                    level = float(scope.removesuffix("%"))
+                    plot, metadata = actual_vs_predicted_plot_frame(
+                        oof, model_name, level
+                    )
+                    self.assertEqual(expected_count, len(plot))
+                    self.assertEqual(expected_count, metadata["retained_rows"])
+                    self.assertTrue(
+                        np.isfinite(
+                            plot[
+                                ["Actual Price (RM)", "OOF Predicted Price (RM)"]
+                            ].to_numpy(float)
+                        ).all()
+                    )
+                    if metadata["cutoff_RM"] is not None:
+                        self.assertLessEqual(
+                            plot["Actual Price (RM)"].max(), metadata["cutoff_RM"]
+                        )
+
+    def test_actual_vs_predicted_rejects_invalid_saved_oof_data(self):
+        oof = load_oof_predictions()
+        with self.assertRaisesRegex(ValueError, "Unknown model"):
+            actual_vs_predicted_plot_frame(oof, "Unknown Model", 5.0)
+
+        invalid = oof.copy()
+        invalid.loc[0, "ridge_prediction"] = np.inf
+        with self.assertRaisesRegex(ValueError, "must all be finite"):
+            actual_vs_predicted_plot_frame(invalid, "Ridge Regression", 0.0)
+
+    def test_actual_vs_predicted_controls_metrics_and_scope_update_together(self):
+        app = AppTest.from_file(str(PROJECT_ROOT / "app.py")).run(timeout=60)
+        app.sidebar.radio[0].set_value("Actual vs Predicted").run(timeout=60)
+        self.assertEqual([], list(app.exception))
+        selectors = {item.label: item for item in app.selectbox}
+        self.assertEqual(
+            ["Select Model to Visualize", "Select Trimming Level"],
+            [item.label for item in app.selectbox],
+        )
+        trim = selectors["Select Trimming Level"]
+        self.assertEqual(list(MARKET_SCOPE_OPTIONS), list(trim.options))
+        self.assertEqual("10%", trim.value)
+        self.assertEqual("prediction_trim_level", trim.key)
+        self.assertFalse(any(item.label == "Listing Segment" for item in app.radio))
+        default_metrics = {item.label: item.value for item in app.metric}
+        self.assertEqual("3,412", default_metrics["Retained Listings"])
+        self.assertEqual("379", default_metrics["Removed Listings"])
+        self.assertEqual("90.00%", default_metrics["Retention Percentage"])
+        self.assertEqual(
+            "RM 699,999", default_metrics["Maximum Retained Actual Price"]
+        )
+
+        trim.set_value("5%").run(timeout=60)
+        self.assertEqual([], list(app.exception))
+        expected = self.summary.loc[
+            self.summary["Model"].eq(FINAL_MODEL_NAME)
+            & self.summary["Trim_Level"].eq("5%")
+        ].iloc[0]
+        metric_values = {item.label: item.value for item in app.metric}
+        self.assertEqual(f"RM {expected['RMSE_RM']:,.0f}", metric_values["RMSE"])
+        self.assertEqual(f"RM {expected['MAE_RM']:,.0f}", metric_values["MAE"])
+        self.assertEqual("3,601", metric_values["Retained Listings"])
+        self.assertEqual("190", metric_values["Removed Listings"])
+        self.assertEqual("RM 900,000", metric_values["Maximum Retained Actual Price"])
+        spec = json.loads(app.get("plotly_chart")[0].proto.spec)
+        self.assertEqual(
+            f"{FINAL_MODEL_NAME}: Actual vs OOF Predicted Price \u2014 5% Trimming",
+            spec["layout"]["title"]["text"],
+        )
+        self.assertIn("Displayed listings: 3,601", app.caption[-1].value)
+
+        model = next(
+            item for item in app.selectbox if item.label == "Select Model to Visualize"
+        )
+        model.set_value("Ridge Regression").run(timeout=60)
+        expected_ridge = self.summary.loc[
+            self.summary["Model"].eq("Ridge Regression")
+            & self.summary["Trim_Level"].eq("5%")
+        ].iloc[0]
+        metric_values = {item.label: item.value for item in app.metric}
+        self.assertEqual(
+            f"RM {expected_ridge['RMSE_RM']:,.0f}", metric_values["RMSE"]
+        )
 
 
 if __name__ == "__main__":
