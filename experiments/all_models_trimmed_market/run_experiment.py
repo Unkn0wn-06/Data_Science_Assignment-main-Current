@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -27,7 +28,9 @@ from src.models.final.final_evaluation import (
 )
 from src.models.final.model_builders import (
     build_standard_ppsf_estimator,
+    final_tuned_params_sha256,
     fit_position_fold,
+    load_final_tuned_config,
 )
 from src.models.final.position_regex_lightgbm import FINAL_MODEL_NAME
 from src.models.final.regex_features import extract_position_features
@@ -43,6 +46,7 @@ LIGHTGBM_REFERENCE_PATH = OUTPUT_DIR / "trimmed_population_comparison.csv"
 SUMMARY_PATH = OUTPUT_DIR / "all_models_trimmed_market_summary.csv"
 FOLD_METRICS_PATH = OUTPUT_DIR / "all_models_trimmed_market_fold_metrics.csv"
 OOF_PATH = OUTPUT_DIR / "all_models_trimmed_market_oof.csv"
+METADATA_PATH = OUTPUT_DIR / "all_models_trimmed_market_metadata.json"
 TRIM_LEVELS = (
     ("0%", 0.0),
     ("0.5%", 0.5),
@@ -363,6 +367,22 @@ def run_experiment():
     summary.to_csv(SUMMARY_PATH, index=False)
     fold_metrics.to_csv(FOLD_METRICS_PATH, index=False)
     oof.to_csv(OOF_PATH, index=False)
+    tuned_config = load_final_tuned_config()
+    metadata = {
+        "purpose": "All-model restricted-market Scenario B OOF comparison",
+        "model_configuration_policy": (
+            "The selected tuned configuration for each model is frozen and reused "
+            "unchanged at every trimming level."
+        ),
+        "tuned_config_sha256": final_tuned_params_sha256(),
+        "selected_parameters": tuned_config["models"],
+        "trim_levels": [label for label, _ in TRIM_LEVELS],
+        "folds": 5,
+        "random_seed": 42,
+    }
+    METADATA_PATH.write_text(
+        json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     after = protected_manifest()
     if before != after:
         changed = sorted(path for path in before if before[path] != after[path])

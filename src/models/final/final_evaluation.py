@@ -17,8 +17,11 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from src.cleaning.pipeline import PROJECT_ROOT
 from src.models.final.description_linkage import link_descriptions
 from src.models.final.model_builders import (
+    FINAL_TUNED_PARAMS_PATH,
     build_standard_ppsf_estimator,
+    final_tuned_params_sha256,
     fit_position_fold,
+    load_final_tuned_config,
 )
 from src.models.final.regex_features import extract_position_features
 from src.models.common.features import CATEGORICAL_FEATURES, MODEL_FEATURES, NUMERICAL_FEATURES
@@ -64,6 +67,24 @@ PREDICTOR_COUNTS = {
     "Gradient Boosting": len(MODEL_FEATURES),
     FINAL_MODEL_NAME: 47,
 }
+
+
+def select_final_model(comparison: pd.DataFrame) -> tuple[str, str]:
+    """Select from new evidence using RMSE first and the saved supporting metrics."""
+    ranked = comparison.sort_values(
+        ["RMSE_RM", "MAE_RM", "R2", "Adjusted_R2"],
+        ascending=[True, True, False, False],
+        kind="stable",
+    )
+    selected = str(ranked.iloc[0]["Model"])
+    row = ranked.iloc[0]
+    rationale = (
+        f"{selected} was selected from the current tuned Scenario B results because "
+        f"it achieved the lowest full-market RMSE (RM {row['RMSE_RM']:,.0f}). "
+        "MAE, R², and adjusted R² were reviewed as supporting evidence using the same "
+        "3,791 listings and group-safe folds."
+    )
+    return selected, rationale
 
 
 def sha256(path: Path) -> str:
@@ -231,6 +252,7 @@ def build_final_results() -> dict:
 
     lowest_rmse = comparison.sort_values("RMSE_RM").iloc[0]["Model"]
     lowest_mae = comparison.sort_values("MAE_RM").iloc[0]["Model"]
+    selected_final_model, selection_rationale = select_final_model(comparison)
     comparison.to_csv(RESULTS_DIR / "model_comparison.csv", index=False)
     oof.to_csv(RESULTS_DIR / "oof_predictions.csv", index=False)
     fold_metrics.to_csv(RESULTS_DIR / "fold_metrics.csv", index=False)
@@ -238,15 +260,10 @@ def build_final_results() -> dict:
 
     comparison_payload = {
         "validation": "Scenario B leakage-safe group cross-validation",
-        "selected_final_model": FINAL_MODEL_NAME,
+        "selected_final_model": selected_final_model,
         "lowest_rmse_model": lowest_rmse,
         "lowest_mae_model": lowest_mae,
-        "selection_rationale": (
-            "LightGBM with position features was selected as the final model because it "
-            "provided competitive and balanced RMSE and MAE while incorporating meaningful "
-            "property-position information from listing descriptions. Differences from the "
-            "strongest competing models were not statistically significant at the 95% confidence level."
-        ),
+        "selection_rationale": selection_rationale,
         "models": comparison.to_dict("records"),
     }
     (RESULTS_DIR / "model_comparison.json").write_text(
@@ -265,7 +282,13 @@ def build_final_results() -> dict:
         "repeat_groups_crossing_folds": 0,
         "models": list(FINAL_MODELS),
         "internal_names": INTERNAL_NAMES,
-        "selected_final_model": FINAL_MODEL_NAME,
+        "selected_final_model": selected_final_model,
+        "tuned_configuration": FINAL_TUNED_PARAMS_PATH.relative_to(PROJECT_ROOT).as_posix(),
+        "tuned_configuration_sha256": final_tuned_params_sha256(),
+        "tuned_parameters": {
+            name: load_final_tuned_config()["models"][name]["parameters"]
+            for name in FINAL_MODELS
+        },
         "target_strategy": "price / property_size_sqft; reconstruct total price by multiplying predicted PPSF by property_size_sqft",
         "position_features": list(POSITION_FEATURES),
         "position_regex_target_free": True,

@@ -27,22 +27,22 @@
   "retained_cv_summary_rows": 30,
   "streamlit_retraining": false,
   "source_experiment": "experiments/upper_tail_trimming",
-  "source_results_sha256": "a6071c53db4998da4cc4185f3eac03d05a7b9b8b5514bcff9a4af1df1f58267b",
+  "source_results_sha256": "c1c1aa295257ac9ba9ec032589e516e03eda41e6270ca3a9f67934f58f988046",
   "source_artifact_sha256": {
-    "training_only_comparison.csv": "eb3cae5b3e79bb54122f56a246cd7c8a2608e1c151c40ff9e00dfe37ccf311b1",
-    "trimmed_population_comparison.csv": "438a2067682db5850789466f8f4f085cf6db5f8c0b4d874e4e6baad0fcee4c0a",
-    "segment_metrics.csv": "5c1c99bea5133bce63644ed34fd7baa3ba283b0d3d8bc5f56fcfd7f830e6544c",
+    "training_only_comparison.csv": "b5e286827be66bf97f68b6f35dfdc1c4f5df854ce260358fe0e149fd2347f420",
+    "trimmed_population_comparison.csv": "8b3fa07b5fcf7dd7ac01fc6389a5db87aa474d476032c3bdbfb3322b01dda408",
+    "segment_metrics.csv": "fb0b191abab15a58c4fe74fa9db2cab3e871df93079131e59edd6d5d586fa67e",
     "distribution_shift.csv": "a6ebb3f79d05eb02596dea64cb028adb6c1c182dd59312d62c7119ae9b1a7983",
-    "bootstrap_results.csv": "7d8b869bfc50f59cc647e7ddd9d1eceac94c63bf2eebe238c4deb57a0dfa14a5",
-    "oof_predictions.csv": "71742d8c7bcea76b21b0735cec3cd04cb4941a22b8fa4c685ab2873ec4212d1b",
-    "results.json": "a6071c53db4998da4cc4185f3eac03d05a7b9b8b5514bcff9a4af1df1f58267b"
+    "bootstrap_results.csv": "1fb3a3c1a662c33cf1ece50597409a012f03e45a634ba38f6bb25ee4e3fa2c58",
+    "oof_predictions.csv": "04f9a95df7907997d03e808d67fbdd274e98dc0520d61316d216f0b7d83f0b6b",
+    "results.json": "c1c1aa295257ac9ba9ec032589e516e03eda41e6270ca3a9f67934f58f988046"
   },
   "exported_artifact_sha256": {
-    "training_only_comparison.csv": "eb3cae5b3e79bb54122f56a246cd7c8a2608e1c151c40ff9e00dfe37ccf311b1",
-    "trimmed_population_comparison.csv": "438a2067682db5850789466f8f4f085cf6db5f8c0b4d874e4e6baad0fcee4c0a",
-    "segment_metrics.csv": "5c1c99bea5133bce63644ed34fd7baa3ba283b0d3d8bc5f56fcfd7f830e6544c",
+    "training_only_comparison.csv": "b5e286827be66bf97f68b6f35dfdc1c4f5df854ce260358fe0e149fd2347f420",
+    "trimmed_population_comparison.csv": "8b3fa07b5fcf7dd7ac01fc6389a5db87aa474d476032c3bdbfb3322b01dda408",
+    "segment_metrics.csv": "fb0b191abab15a58c4fe74fa9db2cab3e871df93079131e59edd6d5d586fa67e",
     "distribution_shift.csv": "a6ebb3f79d05eb02596dea64cb028adb6c1c182dd59312d62c7119ae9b1a7983",
-    "bootstrap_results.csv": "7d8b869bfc50f59cc647e7ddd9d1eceac94c63bf2eebe238c4deb57a0dfa14a5",
+    "bootstrap_results.csv": "1fb3a3c1a662c33cf1ece50597409a012f03e45a634ba38f6bb25ee4e3fa2c58",
     "retained_cv_summary.csv": "e21dbc38d8da00639553633c7cabf7a6c31133c3a221802af226cf9fe32fdc98"
   }
 }

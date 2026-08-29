@@ -1,0 +1,70 @@
+{
+  "folds": 5,
+  "model_configuration_policy": "The selected tuned configuration for each model is frozen and reused unchanged at every trimming level.",
+  "purpose": "All-model restricted-market Scenario B OOF comparison",
+  "random_seed": 42,
+  "selected_parameters": {
+    "Gradient Boosting": {
+      "parameters": {
+        "learning_rate": 0.07,
+        "loss": "huber",
+        "max_depth": 6,
+        "max_features": null,
+        "min_samples_leaf": 5,
+        "min_samples_split": 6,
+        "n_estimators": 400,
+        "random_state": 42,
+        "subsample": 1.0
+      },
+      "scaling": "Not applied \u2014 tree-based model"
+    },
+    "LightGBM + Position Features": {
+      "parameters": {
+        "colsample_bytree": 0.6,
+        "learning_rate": 0.02,
+        "max_depth": 10,
+        "min_child_samples": 10,
+        "n_estimators": 1200,
+        "n_jobs": -1,
+        "num_leaves": 95,
+        "objective": "regression",
+        "random_state": 42,
+        "reg_alpha": 0.1,
+        "reg_lambda": 5.0,
+        "subsample": 0.9,
+        "subsample_freq": 1,
+        "verbosity": -1
+      },
+      "scaling": "Not applied \u2014 tree-based model"
+    },
+    "Random Forest": {
+      "parameters": {
+        "bootstrap": true,
+        "criterion": "poisson",
+        "max_depth": 30,
+        "max_features": 0.5,
+        "min_samples_leaf": 3,
+        "min_samples_split": 2,
+        "n_estimators": 1200,
+        "n_jobs": -1,
+        "random_state": 42
+      },
+      "scaling": "Not applied \u2014 tree-based model"
+    },
+    "Ridge Regression": {
+      "parameters": {
+        "alpha": 1000.0
+      },
+      "scaling": "StandardScaler applied to numerical features"
+    }
+  },
+  "trim_levels": [
+    "0%",
+    "0.5%",
+    "1%",
+    "2.5%",
+    "5%",
+    "10%"
+  ],
+  "tuned_config_sha256": "b948e9f5c3f3dcfd5ee78f9285b60f9c0bfb98fe2f6461a1e7b621fb9b638ad5"
+}

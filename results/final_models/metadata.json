@@ -28,6 +28,51 @@
     "LightGBM + Position Features": "position_regex_lightgbm"
   },
   "selected_final_model": "LightGBM + Position Features",
+  "tuned_configuration": "configs/final_tuned_params.json",
+  "tuned_configuration_sha256": "b948e9f5c3f3dcfd5ee78f9285b60f9c0bfb98fe2f6461a1e7b621fb9b638ad5",
+  "tuned_parameters": {
+    "Ridge Regression": {
+      "alpha": 1000.0
+    },
+    "Random Forest": {
+      "bootstrap": true,
+      "criterion": "poisson",
+      "max_depth": 30,
+      "max_features": 0.5,
+      "min_samples_leaf": 3,
+      "min_samples_split": 2,
+      "n_estimators": 1200,
+      "n_jobs": -1,
+      "random_state": 42
+    },
+    "Gradient Boosting": {
+      "learning_rate": 0.07,
+      "loss": "huber",
+      "max_depth": 6,
+      "max_features": null,
+      "min_samples_leaf": 5,
+      "min_samples_split": 6,
+      "n_estimators": 400,
+      "random_state": 42,
+      "subsample": 1.0
+    },
+    "LightGBM + Position Features": {
+      "colsample_bytree": 0.6,
+      "learning_rate": 0.02,
+      "max_depth": 10,
+      "min_child_samples": 10,
+      "n_estimators": 1200,
+      "n_jobs": -1,
+      "num_leaves": 95,
+      "objective": "regression",
+      "random_state": 42,
+      "reg_alpha": 0.1,
+      "reg_lambda": 5.0,
+      "subsample": 0.9,
+      "subsample_freq": 1,
+      "verbosity": -1
+    }
+  },
   "target_strategy": "price / property_size_sqft; reconstruct total price by multiplying predicted PPSF by property_size_sqft",
   "position_features": [
     "is_high_floor_text",

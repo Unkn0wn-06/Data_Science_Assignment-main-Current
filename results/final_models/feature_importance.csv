@@ -1,144 +1,144 @@
 Model,Feature,Raw_Feature,Importance,Importance_Type
-Ridge Regression,Property Size sq.ft.,property_size_sqft,2.933177371458626,Absolute Coefficient Magnitude
-Ridge Regression,Bedroom,bedroom,32.98180159841259,Absolute Coefficient Magnitude
-Ridge Regression,Bathroom,bathroom,14.698723840341131,Absolute Coefficient Magnitude
-Ridge Regression,Parking Lot,parking_lot,7.259019011168338,Absolute Coefficient Magnitude
-Ridge Regression,Facilities Count,facilities_count,6.851437043999565,Absolute Coefficient Magnitude
-Ridge Regression,Has School,has_school,0.8896497869148242,Absolute Coefficient Magnitude
-Ridge Regression,Has Mall,has_mall,4.254334699792999,Absolute Coefficient Magnitude
-Ridge Regression,Has Hospital,has_hospital,3.6753670487526806,Absolute Coefficient Magnitude
-Ridge Regression,Has Railway,has_railway,0.07893893131579734,Absolute Coefficient Magnitude
-Ridge Regression,Has Bus Stop,has_bus_stop,0.15638531564584104,Absolute Coefficient Magnitude
-Ridge Regression,Has Park,has_park,1.437534660166967,Absolute Coefficient Magnitude
-Ridge Regression,Has Highway,has_highway,3.7948652794449487,Absolute Coefficient Magnitude
-Ridge Regression,Completion Year,completion_year,4.623909534027802,Absolute Coefficient Magnitude
-Ridge Regression,Property Age,property_age,4.623909534025814,Absolute Coefficient Magnitude
-Ridge Regression,Number Of Floors,number_of_floors,1.3393749414026979,Absolute Coefficient Magnitude
-Ridge Regression,Total Units,total_units,5.886435263497298,Absolute Coefficient Magnitude
-Ridge Regression,Description Length,description_length,2.3787878030924383,Absolute Coefficient Magnitude
-Ridge Regression,Has Swimming Pool,has_swimming_pool,0.8895305405347294,Absolute Coefficient Magnitude
-Ridge Regression,Has Security,has_security,8.785739729381532,Absolute Coefficient Magnitude
-Ridge Regression,Has Lift,has_lift,8.483865731579884,Absolute Coefficient Magnitude
-Ridge Regression,Has Gym,has_gym,8.28116168018818,Absolute Coefficient Magnitude
-Ridge Regression,Has Playground,has_playground,0.5866269505261702,Absolute Coefficient Magnitude
-Ridge Regression,Is Furnished,is_furnished,14.442526824177362,Absolute Coefficient Magnitude
-Ridge Regression,Is Renovated,is_renovated,7.13184137786803,Absolute Coefficient Magnitude
-Ridge Regression,Property Type,property_type,0.34224985398900154,Absolute Coefficient Magnitude
-Ridge Regression,Tenure Type,tenure_type,0.14073841382134925,Absolute Coefficient Magnitude
-Ridge Regression,Land Title,land_title,0.05986102254984708,Absolute Coefficient Magnitude
-Ridge Regression,Floor Range,floor_range,0.0018507173186445467,Absolute Coefficient Magnitude
-Ridge Regression,State,state,0.05656204192820787,Absolute Coefficient Magnitude
-Ridge Regression,Building Name,building_name,0.5461948848404972,Absolute Coefficient Magnitude
-Ridge Regression,Developer,developer,0.18798259103379955,Absolute Coefficient Magnitude
-Ridge Regression,City,city,0.2957441708497669,Absolute Coefficient Magnitude
-Random Forest,Property Size sq.ft.,property_size_sqft,0.0623139175844493,Feature Importance
-Random Forest,Bedroom,bedroom,0.019292590277300414,Feature Importance
-Random Forest,Bathroom,bathroom,0.009443287577173887,Feature Importance
-Random Forest,Parking Lot,parking_lot,0.0045788479492332055,Feature Importance
-Random Forest,Facilities Count,facilities_count,0.013197529938540613,Feature Importance
-Random Forest,Has School,has_school,0.0011003531403665937,Feature Importance
-Random Forest,Has Mall,has_mall,0.0009052004148186203,Feature Importance
-Random Forest,Has Hospital,has_hospital,0.0033927898681105407,Feature Importance
-Random Forest,Has Railway,has_railway,0.0011761637604714033,Feature Importance
-Random Forest,Has Bus Stop,has_bus_stop,0.0012385847842670754,Feature Importance
-Random Forest,Has Park,has_park,0.0015823030639309245,Feature Importance
-Random Forest,Has Highway,has_highway,0.000978981815198888,Feature Importance
-Random Forest,Completion Year,completion_year,0.007885585799786352,Feature Importance
-Random Forest,Property Age,property_age,0.007606313839385019,Feature Importance
-Random Forest,Number Of Floors,number_of_floors,0.015448214548985465,Feature Importance
-Random Forest,Total Units,total_units,0.01200880802079434,Feature Importance
-Random Forest,Description Length,description_length,0.02036462979504869,Feature Importance
-Random Forest,Has Swimming Pool,has_swimming_pool,0.0020302265870947335,Feature Importance
-Random Forest,Has Security,has_security,0.0027773755859374556,Feature Importance
-Random Forest,Has Lift,has_lift,0.0025129428976979904,Feature Importance
-Random Forest,Has Gym,has_gym,0.007900742620337412,Feature Importance
-Random Forest,Has Playground,has_playground,0.0013652935120833378,Feature Importance
-Random Forest,Is Furnished,is_furnished,0.0057213176332066,Feature Importance
-Random Forest,Is Renovated,is_renovated,0.00334902766283232,Feature Importance
-Random Forest,Property Type,property_type,0.11375487870052325,Feature Importance
-Random Forest,Tenure Type,tenure_type,0.009392345246437174,Feature Importance
-Random Forest,Land Title,land_title,0.006470902552391492,Feature Importance
-Random Forest,Floor Range,floor_range,0.014581243533338067,Feature Importance
-Random Forest,State,state,0.027667462721278277,Feature Importance
-Random Forest,Building Name,building_name,0.37741707938529073,Feature Importance
-Random Forest,Developer,developer,0.15756182271076757,Feature Importance
-Random Forest,City,city,0.08498323647292214,Feature Importance
-Gradient Boosting,Property Size sq.ft.,property_size_sqft,0.07597762150644384,Feature Importance
-Gradient Boosting,Bedroom,bedroom,0.026097161584531167,Feature Importance
-Gradient Boosting,Bathroom,bathroom,0.006683632322159043,Feature Importance
-Gradient Boosting,Parking Lot,parking_lot,0.007045991188274835,Feature Importance
-Gradient Boosting,Facilities Count,facilities_count,0.012618356541973115,Feature Importance
-Gradient Boosting,Has School,has_school,0.0003660195886348111,Feature Importance
-Gradient Boosting,Has Mall,has_mall,0.0011495355886865022,Feature Importance
-Gradient Boosting,Has Hospital,has_hospital,0.0011705529747097023,Feature Importance
-Gradient Boosting,Has Railway,has_railway,0.0005741837661906446,Feature Importance
-Gradient Boosting,Has Bus Stop,has_bus_stop,0.00044931412340619463,Feature Importance
-Gradient Boosting,Has Park,has_park,0.0009438761614966149,Feature Importance
-Gradient Boosting,Has Highway,has_highway,0.0011748052765239406,Feature Importance
-Gradient Boosting,Completion Year,completion_year,0.009295319588827667,Feature Importance
-Gradient Boosting,Property Age,property_age,0.005467005990136986,Feature Importance
-Gradient Boosting,Number Of Floors,number_of_floors,0.02162031172619291,Feature Importance
-Gradient Boosting,Total Units,total_units,0.015157388388911439,Feature Importance
-Gradient Boosting,Description Length,description_length,0.01647599403554688,Feature Importance
-Gradient Boosting,Has Swimming Pool,has_swimming_pool,0.00028899536465352684,Feature Importance
-Gradient Boosting,Has Security,has_security,0.003780153718393064,Feature Importance
-Gradient Boosting,Has Lift,has_lift,0.002301918520000412,Feature Importance
-Gradient Boosting,Has Gym,has_gym,0.010218765828117978,Feature Importance
-Gradient Boosting,Has Playground,has_playground,0.0004984387804806878,Feature Importance
-Gradient Boosting,Is Furnished,is_furnished,0.011674827997649503,Feature Importance
-Gradient Boosting,Is Renovated,is_renovated,0.003014486301989223,Feature Importance
-Gradient Boosting,Property Type,property_type,0.11070183410005259,Feature Importance
-Gradient Boosting,Tenure Type,tenure_type,0.0043592290563431715,Feature Importance
-Gradient Boosting,Land Title,land_title,0.006409638036906695,Feature Importance
-Gradient Boosting,Floor Range,floor_range,0.014979799273335722,Feature Importance
-Gradient Boosting,State,state,0.020716927889552938,Feature Importance
-Gradient Boosting,Building Name,building_name,0.37991825091876535,Feature Importance
-Gradient Boosting,Developer,developer,0.1424627342832403,Feature Importance
-Gradient Boosting,City,city,0.0864069295778725,Feature Importance
-LightGBM + Position Features,Property Size sq.ft.,property_size_sqft,2745.0,Feature Importance
-LightGBM + Position Features,Bedroom,bedroom,448.0,Feature Importance
-LightGBM + Position Features,Bathroom,bathroom,238.0,Feature Importance
-LightGBM + Position Features,Parking Lot,parking_lot,206.0,Feature Importance
-LightGBM + Position Features,Facilities Count,facilities_count,887.0,Feature Importance
-LightGBM + Position Features,Has School,has_school,54.0,Feature Importance
-LightGBM + Position Features,Has Mall,has_mall,78.0,Feature Importance
-LightGBM + Position Features,Has Hospital,has_hospital,56.0,Feature Importance
-LightGBM + Position Features,Has Railway,has_railway,73.0,Feature Importance
-LightGBM + Position Features,Has Bus Stop,has_bus_stop,76.0,Feature Importance
-LightGBM + Position Features,Has Park,has_park,81.0,Feature Importance
-LightGBM + Position Features,Has Highway,has_highway,47.0,Feature Importance
-LightGBM + Position Features,Completion Year,completion_year,778.0,Feature Importance
-LightGBM + Position Features,Property Age,property_age,143.0,Feature Importance
-LightGBM + Position Features,Number Of Floors,number_of_floors,751.0,Feature Importance
-LightGBM + Position Features,Total Units,total_units,902.0,Feature Importance
-LightGBM + Position Features,Description Length,description_length,2161.0,Feature Importance
-LightGBM + Position Features,Has Swimming Pool,has_swimming_pool,65.0,Feature Importance
-LightGBM + Position Features,Has Security,has_security,81.0,Feature Importance
-LightGBM + Position Features,Has Lift,has_lift,194.0,Feature Importance
-LightGBM + Position Features,Has Gym,has_gym,118.0,Feature Importance
-LightGBM + Position Features,Has Playground,has_playground,98.0,Feature Importance
-LightGBM + Position Features,Is Furnished,is_furnished,195.0,Feature Importance
-LightGBM + Position Features,Is Renovated,is_renovated,181.0,Feature Importance
-LightGBM + Position Features,Log1P Property Size sq.ft.,log1p_property_size_sqft,508.0,Feature Importance
-LightGBM + Position Features,Property Size sq.ft. Squared,property_size_sqft_squared,96.0,Feature Importance
-LightGBM + Position Features,High Floor,is_high_floor_text,31.0,Feature Importance
-LightGBM + Position Features,Low Floor,is_low_floor_text,7.0,Feature Importance
-LightGBM + Position Features,Top Floor,is_top_floor_text,15.0,Feature Importance
-LightGBM + Position Features,Balcony,has_balcony,55.0,Feature Importance
+Ridge Regression,Property Size sq.ft.,property_size_sqft,2.2406851906353995,Absolute Coefficient Magnitude
+Ridge Regression,Bedroom,bedroom,21.507002236288017,Absolute Coefficient Magnitude
+Ridge Regression,Bathroom,bathroom,5.769001868047349,Absolute Coefficient Magnitude
+Ridge Regression,Parking Lot,parking_lot,4.966228052006218,Absolute Coefficient Magnitude
+Ridge Regression,Facilities Count,facilities_count,0.1527615098413789,Absolute Coefficient Magnitude
+Ridge Regression,Has School,has_school,0.46859632257218475,Absolute Coefficient Magnitude
+Ridge Regression,Has Mall,has_mall,3.450141785489759,Absolute Coefficient Magnitude
+Ridge Regression,Has Hospital,has_hospital,3.0185196995115926,Absolute Coefficient Magnitude
+Ridge Regression,Has Railway,has_railway,0.4319496653407795,Absolute Coefficient Magnitude
+Ridge Regression,Has Bus Stop,has_bus_stop,0.6388098083153353,Absolute Coefficient Magnitude
+Ridge Regression,Has Park,has_park,0.8714118989148142,Absolute Coefficient Magnitude
+Ridge Regression,Has Highway,has_highway,2.8532630946504747,Absolute Coefficient Magnitude
+Ridge Regression,Completion Year,completion_year,4.138537801335119,Absolute Coefficient Magnitude
+Ridge Regression,Property Age,property_age,4.138537801335095,Absolute Coefficient Magnitude
+Ridge Regression,Number Of Floors,number_of_floors,1.3597569838364951,Absolute Coefficient Magnitude
+Ridge Regression,Total Units,total_units,4.824511889158658,Absolute Coefficient Magnitude
+Ridge Regression,Description Length,description_length,2.2994892748030766,Absolute Coefficient Magnitude
+Ridge Regression,Has Swimming Pool,has_swimming_pool,1.2133100803115784,Absolute Coefficient Magnitude
+Ridge Regression,Has Security,has_security,5.831128223663887,Absolute Coefficient Magnitude
+Ridge Regression,Has Lift,has_lift,6.02807909278771,Absolute Coefficient Magnitude
+Ridge Regression,Has Gym,has_gym,4.773660584249266,Absolute Coefficient Magnitude
+Ridge Regression,Has Playground,has_playground,1.0961545969414275,Absolute Coefficient Magnitude
+Ridge Regression,Is Furnished,is_furnished,11.820365259463,Absolute Coefficient Magnitude
+Ridge Regression,Is Renovated,is_renovated,5.653503267433282,Absolute Coefficient Magnitude
+Ridge Regression,Property Type,property_type,0.3681409860653086,Absolute Coefficient Magnitude
+Ridge Regression,Tenure Type,tenure_type,0.1515768654973058,Absolute Coefficient Magnitude
+Ridge Regression,Land Title,land_title,0.0780257078172597,Absolute Coefficient Magnitude
+Ridge Regression,Floor Range,floor_range,0.001587507747718906,Absolute Coefficient Magnitude
+Ridge Regression,State,state,0.050847618116415694,Absolute Coefficient Magnitude
+Ridge Regression,Building Name,building_name,0.5571921013805825,Absolute Coefficient Magnitude
+Ridge Regression,Developer,developer,0.1993724165246352,Absolute Coefficient Magnitude
+Ridge Regression,City,city,0.3008998382952022,Absolute Coefficient Magnitude
+Random Forest,Property Size sq.ft.,property_size_sqft,0.05258127734377602,Feature Importance
+Random Forest,Bedroom,bedroom,0.02403263068651129,Feature Importance
+Random Forest,Bathroom,bathroom,0.01137690773253731,Feature Importance
+Random Forest,Parking Lot,parking_lot,0.004375053438457612,Feature Importance
+Random Forest,Facilities Count,facilities_count,0.015163012829153211,Feature Importance
+Random Forest,Has School,has_school,0.0014899252524772097,Feature Importance
+Random Forest,Has Mall,has_mall,0.0008992497133707098,Feature Importance
+Random Forest,Has Hospital,has_hospital,0.001854167548838441,Feature Importance
+Random Forest,Has Railway,has_railway,0.0010736715746808016,Feature Importance
+Random Forest,Has Bus Stop,has_bus_stop,0.0013960222447958186,Feature Importance
+Random Forest,Has Park,has_park,0.0017664699004824366,Feature Importance
+Random Forest,Has Highway,has_highway,0.0006527144745064665,Feature Importance
+Random Forest,Completion Year,completion_year,0.009416825466274467,Feature Importance
+Random Forest,Property Age,property_age,0.009476477919298492,Feature Importance
+Random Forest,Number Of Floors,number_of_floors,0.01543031408966956,Feature Importance
+Random Forest,Total Units,total_units,0.011188340851168608,Feature Importance
+Random Forest,Description Length,description_length,0.019112256458294986,Feature Importance
+Random Forest,Has Swimming Pool,has_swimming_pool,0.004037350619790673,Feature Importance
+Random Forest,Has Security,has_security,0.004285722931794197,Feature Importance
+Random Forest,Has Lift,has_lift,0.0031539340412622195,Feature Importance
+Random Forest,Has Gym,has_gym,0.013366043488430497,Feature Importance
+Random Forest,Has Playground,has_playground,0.0018214597466155247,Feature Importance
+Random Forest,Is Furnished,is_furnished,0.006418352516469093,Feature Importance
+Random Forest,Is Renovated,is_renovated,0.003121018333124809,Feature Importance
+Random Forest,Property Type,property_type,0.13559740902439799,Feature Importance
+Random Forest,Tenure Type,tenure_type,0.009669179066151728,Feature Importance
+Random Forest,Land Title,land_title,0.006189687981231298,Feature Importance
+Random Forest,Floor Range,floor_range,0.013507503514158345,Feature Importance
+Random Forest,State,state,0.04066465396565469,Feature Importance
+Random Forest,Building Name,building_name,0.30028738559774854,Feature Importance
+Random Forest,Developer,developer,0.17100251791596244,Feature Importance
+Random Forest,City,city,0.10559246373291463,Feature Importance
+Gradient Boosting,Property Size sq.ft.,property_size_sqft,0.039335028256240634,Feature Importance
+Gradient Boosting,Bedroom,bedroom,0.016569166274099555,Feature Importance
+Gradient Boosting,Bathroom,bathroom,0.0030788166606308463,Feature Importance
+Gradient Boosting,Parking Lot,parking_lot,0.007029454965751941,Feature Importance
+Gradient Boosting,Facilities Count,facilities_count,0.013386999033314351,Feature Importance
+Gradient Boosting,Has School,has_school,0.0009894343851161182,Feature Importance
+Gradient Boosting,Has Mall,has_mall,0.000928865787194429,Feature Importance
+Gradient Boosting,Has Hospital,has_hospital,0.000668991337006813,Feature Importance
+Gradient Boosting,Has Railway,has_railway,0.000742868674011018,Feature Importance
+Gradient Boosting,Has Bus Stop,has_bus_stop,0.0012868770732076056,Feature Importance
+Gradient Boosting,Has Park,has_park,0.0005390172938785504,Feature Importance
+Gradient Boosting,Has Highway,has_highway,0.0004400062298167057,Feature Importance
+Gradient Boosting,Completion Year,completion_year,0.006271108646033194,Feature Importance
+Gradient Boosting,Property Age,property_age,0.005065070222618385,Feature Importance
+Gradient Boosting,Number Of Floors,number_of_floors,0.01814181809708338,Feature Importance
+Gradient Boosting,Total Units,total_units,0.010732509670918905,Feature Importance
+Gradient Boosting,Description Length,description_length,0.01787694827211192,Feature Importance
+Gradient Boosting,Has Swimming Pool,has_swimming_pool,0.0011646263454368143,Feature Importance
+Gradient Boosting,Has Security,has_security,0.005068218640633452,Feature Importance
+Gradient Boosting,Has Lift,has_lift,0.0027573053538859646,Feature Importance
+Gradient Boosting,Has Gym,has_gym,0.009925339495670475,Feature Importance
+Gradient Boosting,Has Playground,has_playground,0.0011030281840118008,Feature Importance
+Gradient Boosting,Is Furnished,is_furnished,0.010329114518017306,Feature Importance
+Gradient Boosting,Is Renovated,is_renovated,0.0030131268037537438,Feature Importance
+Gradient Boosting,Property Type,property_type,0.12539183450736138,Feature Importance
+Gradient Boosting,Tenure Type,tenure_type,0.006189514585462646,Feature Importance
+Gradient Boosting,Land Title,land_title,0.004244136265184195,Feature Importance
+Gradient Boosting,Floor Range,floor_range,0.009965848366150621,Feature Importance
+Gradient Boosting,State,state,0.023494924761155906,Feature Importance
+Gradient Boosting,Building Name,building_name,0.4998711412733389,Feature Importance
+Gradient Boosting,Developer,developer,0.0731048513461904,Feature Importance
+Gradient Boosting,City,city,0.08129400867471191,Feature Importance
+LightGBM + Position Features,Property Size sq.ft.,property_size_sqft,5586.0,Feature Importance
+LightGBM + Position Features,Bedroom,bedroom,826.0,Feature Importance
+LightGBM + Position Features,Bathroom,bathroom,503.0,Feature Importance
+LightGBM + Position Features,Parking Lot,parking_lot,492.0,Feature Importance
+LightGBM + Position Features,Facilities Count,facilities_count,2382.0,Feature Importance
+LightGBM + Position Features,Has School,has_school,148.0,Feature Importance
+LightGBM + Position Features,Has Mall,has_mall,194.0,Feature Importance
+LightGBM + Position Features,Has Hospital,has_hospital,150.0,Feature Importance
+LightGBM + Position Features,Has Railway,has_railway,158.0,Feature Importance
+LightGBM + Position Features,Has Bus Stop,has_bus_stop,153.0,Feature Importance
+LightGBM + Position Features,Has Park,has_park,179.0,Feature Importance
+LightGBM + Position Features,Has Highway,has_highway,66.0,Feature Importance
+LightGBM + Position Features,Completion Year,completion_year,1702.0,Feature Importance
+LightGBM + Position Features,Property Age,property_age,816.0,Feature Importance
+LightGBM + Position Features,Number Of Floors,number_of_floors,1806.0,Feature Importance
+LightGBM + Position Features,Total Units,total_units,2179.0,Feature Importance
+LightGBM + Position Features,Description Length,description_length,5841.0,Feature Importance
+LightGBM + Position Features,Has Swimming Pool,has_swimming_pool,163.0,Feature Importance
+LightGBM + Position Features,Has Security,has_security,189.0,Feature Importance
+LightGBM + Position Features,Has Lift,has_lift,442.0,Feature Importance
+LightGBM + Position Features,Has Gym,has_gym,251.0,Feature Importance
+LightGBM + Position Features,Has Playground,has_playground,219.0,Feature Importance
+LightGBM + Position Features,Is Furnished,is_furnished,566.0,Feature Importance
+LightGBM + Position Features,Is Renovated,is_renovated,544.0,Feature Importance
+LightGBM + Position Features,Log1P Property Size sq.ft.,log1p_property_size_sqft,2157.0,Feature Importance
+LightGBM + Position Features,Property Size sq.ft. Squared,property_size_sqft_squared,869.0,Feature Importance
+LightGBM + Position Features,High Floor,is_high_floor_text,92.0,Feature Importance
+LightGBM + Position Features,Low Floor,is_low_floor_text,5.0,Feature Importance
+LightGBM + Position Features,Top Floor,is_top_floor_text,43.0,Feature Importance
+LightGBM + Position Features,Balcony,has_balcony,122.0,Feature Importance
 LightGBM + Position Features,Large Balcony,has_large_balcony,0.0,Feature Importance
-LightGBM + Position Features,Property Type,property_type,510.0,Feature Importance
-LightGBM + Position Features,Tenure Type,tenure_type,559.0,Feature Importance
-LightGBM + Position Features,Land Title,land_title,432.0,Feature Importance
-LightGBM + Position Features,Floor Range,floor_range,1139.0,Feature Importance
-LightGBM + Position Features,State,state,811.0,Feature Importance
-LightGBM + Position Features,Building Name,building_name,1864.0,Feature Importance
-LightGBM + Position Features,Developer,developer,1537.0,Feature Importance
-LightGBM + Position Features,City,city,1070.0,Feature Importance
-LightGBM + Position Features,Size Band,size_band,702.0,Feature Importance
-LightGBM + Position Features,State Property Type,state_property_type,1081.0,Feature Importance
-LightGBM + Position Features,City Property Type,city_property_type,1682.0,Feature Importance
-LightGBM + Position Features,City Tenure Type,city_tenure_type,1469.0,Feature Importance
-LightGBM + Position Features,City Building Name,city_building_name,562.0,Feature Importance
-LightGBM + Position Features,City Developer,city_developer,1675.0,Feature Importance
-LightGBM + Position Features,City Size Band,city_size_band,1859.0,Feature Importance
-LightGBM + Position Features,Property Type Size Band,property_type_size_band,1680.0,Feature Importance
+LightGBM + Position Features,Property Type,property_type,1450.0,Feature Importance
+LightGBM + Position Features,Tenure Type,tenure_type,1630.0,Feature Importance
+LightGBM + Position Features,Land Title,land_title,1316.0,Feature Importance
+LightGBM + Position Features,Floor Range,floor_range,3160.0,Feature Importance
+LightGBM + Position Features,State,state,2176.0,Feature Importance
+LightGBM + Position Features,Building Name,building_name,4538.0,Feature Importance
+LightGBM + Position Features,Developer,developer,3433.0,Feature Importance
+LightGBM + Position Features,City,city,2885.0,Feature Importance
+LightGBM + Position Features,Size Band,size_band,1647.0,Feature Importance
+LightGBM + Position Features,State Property Type,state_property_type,2613.0,Feature Importance
+LightGBM + Position Features,City Property Type,city_property_type,3602.0,Feature Importance
+LightGBM + Position Features,City Tenure Type,city_tenure_type,3692.0,Feature Importance
+LightGBM + Position Features,City Building Name,city_building_name,2021.0,Feature Importance
+LightGBM + Position Features,City Developer,city_developer,3844.0,Feature Importance
+LightGBM + Position Features,City Size Band,city_size_band,4023.0,Feature Importance
+LightGBM + Position Features,Property Type Size Band,property_type_size_band,2999.0,Feature Importance

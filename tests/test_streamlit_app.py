@@ -21,8 +21,9 @@ from prototype.app import (
     actual_vs_predicted_plot_frame,
     build_official_metric_chart,
     condition_feature_values,
+    load_all_models_trimming_oof,
     load_all_models_trimming_summary,
-    load_oof_predictions,
+    _load_scope_models_cached,
     load_scope_models,
     load_tuning_details,
     normalized_scope_display_frame,
@@ -199,24 +200,36 @@ class ScopeAwareStreamlitTests(unittest.TestCase):
         self.assertEqual(set(FINAL_MODELS), set(details))
         ridge = details["Ridge Regression"]
         alpha = ridge["search_space"].loc[
-            ridge["search_space"]["Hyperparameter"].eq("model__alpha")
+            ridge["search_space"]["Hyperparameter"].eq("alpha")
         ].iloc[0]
         self.assertIn("0.001", alpha["Values Tested"])
-        self.assertIn("10000.0", alpha["Values Tested"])
+        self.assertIn("1000.0", alpha["Values Tested"])
         final_alpha = ridge["final_parameters"].loc[
             ridge["final_parameters"]["Hyperparameter"].eq("alpha"), "Final Value"
         ].iloc[0]
-        self.assertEqual("10.0", final_alpha)
-        self.assertIn("RandomizedSearchCV", ridge["method"])
-        self.assertIn("not group-safe", ridge["validation"])
+        self.assertEqual("1000.0", final_alpha)
+        self.assertIn("31", ridge["method"])
+        self.assertIn("group-safe", ridge["validation"])
+        self.assertIn("StandardScaler", ridge["scaling"])
+        self.assertLess(
+            ridge["before_after"].loc[
+                ridge["before_after"]["Metric"].eq("RMSE"), "Change"
+            ].iloc[0],
+            0,
+        )
 
         lightgbm = details[FINAL_MODEL_NAME]
-        self.assertTrue(lightgbm["search_space"].empty)
+        self.assertFalse(lightgbm["search_space"].empty)
         n_estimators = lightgbm["final_parameters"].loc[
             lightgbm["final_parameters"]["Hyperparameter"].eq("n_estimators"), "Final Value"
         ].iloc[0]
-        self.assertEqual("1000", n_estimators)
-        self.assertTrue(lightgbm["final_parameters"]["Status"].eq("Fixed model parameter").all())
+        self.assertEqual("1200", n_estimators)
+        self.assertEqual(80, lightgbm["candidate_count"])
+        self.assertTrue(
+            lightgbm["final_parameters"]["Status"].eq(
+                "Selected by current formal tuning"
+            ).all()
+        )
 
     def test_comparison_interactions_do_not_fit_models(self):
         source = inspect.getsource(render_model_evaluation)
@@ -225,8 +238,9 @@ class ScopeAwareStreamlitTests(unittest.TestCase):
         self.assertIn("load_all_models_trimming_summary", source)
 
         loader_source = inspect.getsource(load_scope_models)
-        self.assertIn("@st.cache_resource", loader_source)
+        self.assertIn("final_tuned_params_sha256", loader_source)
         self.assertEqual(["scope"], list(inspect.signature(load_scope_models).parameters))
+        self.assertIn("@st.cache_resource", inspect.getsource(_load_scope_models_cached))
         predictor_source = inspect.getsource(render_scope_predictor)
         self.assertIn('selected_models if selected_scope == "0%"', predictor_source)
 
@@ -247,7 +261,7 @@ class ScopeAwareStreamlitTests(unittest.TestCase):
                     self.assertAlmostEqual(saved.loc[model_name, column], plotted[model_name])
 
     def test_actual_vs_predicted_uses_saved_cutoffs_for_every_trim_level(self):
-        oof = load_oof_predictions()
+        oof = load_all_models_trimming_oof()
         expected_counts = {
             "0%": 3_791,
             "0.5%": 3_772,
@@ -259,9 +273,8 @@ class ScopeAwareStreamlitTests(unittest.TestCase):
         for model_name in FINAL_MODELS:
             for scope, expected_count in expected_counts.items():
                 with self.subTest(model=model_name, scope=scope):
-                    level = float(scope.removesuffix("%"))
                     plot, metadata = actual_vs_predicted_plot_frame(
-                        oof, model_name, level
+                        oof, model_name, scope
                     )
                     self.assertEqual(expected_count, len(plot))
                     self.assertEqual(expected_count, metadata["retained_rows"])
@@ -278,14 +291,15 @@ class ScopeAwareStreamlitTests(unittest.TestCase):
                         )
 
     def test_actual_vs_predicted_rejects_invalid_saved_oof_data(self):
-        oof = load_oof_predictions()
+        oof = load_all_models_trimming_oof()
         with self.assertRaisesRegex(ValueError, "Unknown model"):
-            actual_vs_predicted_plot_frame(oof, "Unknown Model", 5.0)
+            actual_vs_predicted_plot_frame(oof, "Unknown Model", "5%")
 
         invalid = oof.copy()
-        invalid.loc[0, "ridge_prediction"] = np.inf
+        row = invalid.index[invalid["Model"].eq("Ridge Regression")][0]
+        invalid.loc[row, "predicted_price_RM"] = np.inf
         with self.assertRaisesRegex(ValueError, "must all be finite"):
-            actual_vs_predicted_plot_frame(invalid, "Ridge Regression", 0.0)
+            actual_vs_predicted_plot_frame(invalid, "Ridge Regression", "0%")
 
     def test_actual_vs_predicted_controls_metrics_and_scope_update_together(self):
         app = AppTest.from_file(str(PROJECT_ROOT / "app.py")).run(timeout=60)

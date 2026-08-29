@@ -22,6 +22,7 @@ from src.models.final.description_linkage import link_descriptions
 from src.models.final.model_builders import (
     build_standard_ppsf_estimator,
     fit_position_fold,
+    get_final_model_parameters,
 )
 from src.models.final.regex_features import extract_position_features
 
@@ -67,33 +68,8 @@ PROTECTED_DIRECTORIES = (
     ROOT / "src" / "models" / "final",
 )
 MODEL_PARAMETERS = {
-    "LightGBM + Position Features": {
-        "n_estimators": 1000,
-        "learning_rate": 0.03,
-        "num_leaves": 31,
-        "max_depth": -1,
-        "min_child_samples": 20,
-        "subsample": 0.8,
-        "subsample_freq": 1,
-        "colsample_bytree": 0.8,
-        "reg_alpha": 0.1,
-        "reg_lambda": 1.0,
-        "random_state": 42,
-        "n_jobs": -1,
-        "verbosity": -1,
-        "objective": "regression",
-    },
-    "Random Forest": {
-        "n_estimators": 700,
-        "min_samples_split": 6,
-        "min_samples_leaf": 3,
-        "max_features": 0.7,
-        "max_depth": 24,
-        "criterion": "squared_error",
-        "bootstrap": True,
-        "random_state": 42,
-        "n_jobs": -1,
-    },
+    model_name: get_final_model_parameters(model_name)
+    for model_name in MODELS
 }
 
 

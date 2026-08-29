@@ -1,8 +1,7 @@
-"""Final Streamlit dashboard backed by saved Scenario B evaluation artifacts."""
+"""Streamlit dashboard backed by current tuned Scenario B evaluation artifacts."""
 
 from __future__ import annotations
 
-import ast
 import json
 import sys
 from pathlib import Path
@@ -20,10 +19,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.models.common.features import MODEL_FEATURES
 from src.models.final.final_evaluation import FINAL_MODELS, PREDICTION_COLUMNS
-from src.models.final.model_builders import (
-    build_position_lightgbm,
-    build_standard_ppsf_estimator,
-)
+from src.models.final.model_builders import final_tuned_params_sha256
 from src.models.final.position_regex_lightgbm import (
     FINAL_MODEL_NAME,
     POSITION_DISPLAY_NAMES,
@@ -52,15 +48,14 @@ TRIMMING_METADATA_PATH = TRIMMING_RESULTS_DIR / "metadata.json"
 ALL_MODELS_TRIMMING_PATH = (
     TRIMMING_RESULTS_DIR / "all_models_trimmed_market_summary.csv"
 )
-TUNING_RESULTS_PATH = PROJECT_ROOT / "configs" / "tuning_candidates.json"
-TUNING_RUNNER_PATH = (
-    PROJECT_ROOT / "archive" / "legacy_scripts" / "model_tuning" / "src__models__tuning.py"
+ALL_MODELS_TRIMMING_OOF_PATH = (
+    TRIMMING_RESULTS_DIR / "all_models_trimmed_market_oof.csv"
 )
-TUNING_SEARCH_PATHS = {
-    "Ridge Regression": PROJECT_ROOT / "archive" / "legacy_scripts" / "model_tuning" / "src__models__ridge__tuning.py",
-    "Random Forest": PROJECT_ROOT / "archive" / "legacy_scripts" / "model_tuning" / "src__models__random_forest__tuning.py",
-    "Gradient Boosting": PROJECT_ROOT / "archive" / "legacy_scripts" / "model_tuning" / "src__models__gradient_boosting__tuning.py",
-}
+TUNING_DIR = PROJECT_ROOT / "results" / "tuning"
+TUNING_METADATA_PATH = TUNING_DIR / "metadata.json"
+TUNING_SUMMARY_PATH = TUNING_DIR / "tuning_summary.csv"
+TUNING_CANDIDATES_PATH = TUNING_DIR / "tuning_candidates.csv"
+TUNED_CV_RESULTS_PATH = TUNING_DIR / "tuned_cv_results.csv"
 MARKET_SCOPE_OPTIONS = tuple(f"{level:g}%" for level in SUPPORTED_TRIM_LEVELS)
 OVERVIEW_VIEW = "\U0001f3e0 Overview"
 EDA_VIEW = "\U0001f4ca Data & EDA"
@@ -195,8 +190,8 @@ def load_trimming_results() -> tuple[dict, dict[str, pd.DataFrame]]:
     levels = sorted(tables["training_only_comparison"]["Removal_Percent"].unique())
     if levels != expected_levels:
         raise ValueError("Saved trimming results do not contain the six expected levels.")
-    if metadata.get("recommended_trimming") != "0%":
-        raise ValueError("Saved trimming recommendation must remain 0%.")
+    if metadata.get("recommended_trimming") not in MARKET_SCOPE_OPTIONS:
+        raise ValueError("Saved trimming recommendation is not a supported level.")
     if metadata.get("production_model") != FINAL_MODEL_NAME:
         raise ValueError("Saved trimming results reference an unexpected production model.")
     retained_cv = tables["retained_cv_summary"]
@@ -260,18 +255,78 @@ def load_all_models_trimming_summary() -> pd.DataFrame:
     return summary
 
 
+@st.cache_data
+def load_all_models_trimming_oof() -> pd.DataFrame:
+    """Load and verify retrained OOF predictions for every model/scope pair."""
+    oof = pd.read_csv(ALL_MODELS_TRIMMING_OOF_PATH)
+    required = [
+        "Model",
+        "Trim_Level",
+        "Removal_Percent",
+        "listing_id",
+        "scenario_b_fold",
+        "actual_price_RM",
+        "predicted_price_RM",
+    ]
+    if list(oof.columns) != required:
+        raise ValueError("All-model trimming OOF data has an unexpected schema.")
+    if set(oof["Model"]) != set(FINAL_MODELS):
+        raise ValueError("All-model trimming OOF data does not cover all models.")
+    if oof.duplicated(["Model", "Trim_Level", "listing_id"]).any():
+        raise ValueError("All-model trimming OOF data contains duplicate listing predictions.")
+    if not np.isfinite(
+        oof[["actual_price_RM", "predicted_price_RM"]].to_numpy(float)
+    ).all():
+        raise ValueError("All-model trimming OOF prices must be finite.")
+
+    summary = load_all_models_trimming_summary().set_index(["Model", "Trim_Level"])
+    for key, rows in oof.groupby(["Model", "Trim_Level"], sort=False):
+        if key not in summary.index:
+            raise ValueError(f"OOF data has an unexpected model/scope pair: {key}.")
+        saved = summary.loc[key]
+        actual = rows["actual_price_RM"].to_numpy(float)
+        predicted = rows["predicted_price_RM"].to_numpy(float)
+        residual = predicted - actual
+        rmse = float(np.sqrt(np.mean(np.square(residual))))
+        mae = float(np.mean(np.abs(residual)))
+        r2 = float(1.0 - np.square(residual).sum() / np.square(actual - actual.mean()).sum())
+        if len(rows) != int(saved["Retained_Rows"]):
+            raise ValueError(f"OOF row count does not match saved metrics for {key}.")
+        if not np.allclose(
+            [rmse, mae, r2],
+            [saved["RMSE_RM"], saved["MAE_RM"], saved["R2"]],
+            rtol=1e-10,
+            atol=[1e-6, 1e-6, 1e-12],
+        ):
+            raise ValueError(f"OOF predictions do not reproduce saved metrics for {key}.")
+    if len(summary) != oof.groupby(["Model", "Trim_Level"]).ngroups:
+        raise ValueError("All-model trimming OOF data is missing model/scope pairs.")
+    return oof
+
+
 @st.cache_resource
-def load_deployment_model():
+def _load_deployment_model_cached(model_config_hash: str):
     """Fit only the selected final model, once per Streamlit process."""
+    if model_config_hash != final_tuned_params_sha256():
+        raise ValueError("Deployment cache fingerprint does not match tuned parameters.")
     model = fit_final_model()
     if model.training_rows_ != 3_791:
         raise AssertionError("Deployment model did not train on all canonical rows.")
     return model
 
 
+def load_deployment_model():
+    return _load_deployment_model_cached(final_tuned_params_sha256())
+
+
 @st.cache_resource
-def load_trimmed_deployment_model(trim_level: float):
+def _load_trimmed_deployment_model_cached(
+    trim_level: float,
+    model_config_hash: str,
+):
     """Fit and cache one experimental deployment model per saved trim level."""
+    if model_config_hash != final_tuned_params_sha256():
+        raise ValueError("Trimmed-model cache fingerprint does not match tuned parameters.")
     model = fit_trimmed_market_model(trim_level)
     metadata = get_trim_market_metadata(trim_level)
     if model.training_rows_ != metadata["retained_rows"]:
@@ -279,15 +334,31 @@ def load_trimmed_deployment_model(trim_level: float):
     return model
 
 
+def load_trimmed_deployment_model(trim_level: float):
+    return _load_trimmed_deployment_model_cached(
+        trim_level, final_tuned_params_sha256()
+    )
+
+
 @st.cache_resource
-def load_scope_models(scope: str) -> dict[str, object]:
+def _load_scope_models_cached(
+    scope: str,
+    model_config_hash: str,
+) -> dict[str, object]:
     """Fit and cache the four deployment families for one saved scope."""
+    if model_config_hash != final_tuned_params_sha256():
+        raise ValueError("Scope-model cache fingerprint does not match tuned parameters.")
     if scope not in MARKET_SCOPE_OPTIONS:
         raise ValueError(f"Market scope must be one of: {', '.join(MARKET_SCOPE_OPTIONS)}.")
     models = fit_market_scope_models(float(scope.removesuffix("%")))
     if tuple(models) != FINAL_MODELS:
         raise AssertionError("Scope model loader did not return the four final families.")
     return models
+
+
+def load_scope_models(scope: str) -> dict[str, object]:
+    """Load one cached scope using the current tuned-configuration fingerprint."""
+    return _load_scope_models_cached(scope, final_tuned_params_sha256())
 
 
 def scope_comparison_frame(summary: pd.DataFrame, scope: str) -> pd.DataFrame:
@@ -392,17 +463,6 @@ def prediction_comparison_frame(
     return pd.DataFrame(rows)
 
 
-def _literal_assignment(path: Path, variable: str):
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and any(
-            isinstance(target, ast.Name) and target.id == variable
-            for target in node.targets
-        ):
-            return ast.literal_eval(node.value)
-    raise ValueError(f"{path} does not define {variable} as a literal value.")
-
-
 def _display_value(value) -> str:
     if isinstance(value, (list, tuple)):
         return ", ".join("None" if item is None else str(item) for item in value)
@@ -411,116 +471,88 @@ def _display_value(value) -> str:
     return str(value)
 
 
-def _final_model_parameters(model_name: str) -> dict[str, object]:
-    """Read presentation parameters from the authoritative frozen builders."""
-    parameter_names = {
-        "Ridge Regression": ("alpha",),
-        "Random Forest": (
-            "n_estimators",
-            "max_depth",
-            "min_samples_split",
-            "min_samples_leaf",
-            "max_features",
-            "criterion",
-            "bootstrap",
-            "random_state",
-            "n_jobs",
-        ),
-        "Gradient Boosting": (
-            "n_estimators",
-            "learning_rate",
-            "max_depth",
-            "random_state",
-        ),
-        FINAL_MODEL_NAME: (
-            "n_estimators",
-            "learning_rate",
-            "num_leaves",
-            "max_depth",
-            "min_child_samples",
-            "subsample",
-            "subsample_freq",
-            "colsample_bytree",
-            "reg_alpha",
-            "reg_lambda",
-            "objective",
-            "random_state",
-            "n_jobs",
-        ),
-    }
-    if model_name == FINAL_MODEL_NAME:
-        estimator = build_position_lightgbm()[0].named_steps["model"]
-    else:
-        estimator = build_standard_ppsf_estimator(model_name).regressor.named_steps["model"]
-    all_parameters = estimator.get_params(deep=False)
-    return {name: all_parameters[name] for name in parameter_names[model_name]}
-
-
 @st.cache_data
 def load_tuning_details() -> dict[str, dict]:
-    """Load only genuine historical search evidence and current frozen settings."""
-    historical = json.loads(TUNING_RESULTS_PATH.read_text(encoding="utf-8"))
-    if historical.get("search") != "RandomizedSearchCV" or historical.get("cv") != 5:
-        raise ValueError("Historical tuning artifact has an unexpected method or fold count.")
-    if "KFold(n_splits=5, shuffle=True, random_state=42)" not in TUNING_RUNNER_PATH.read_text(
-        encoding="utf-8"
-    ):
-        raise ValueError("Historical tuning runner no longer documents its validation split.")
-
+    """Load current formal Scenario B tuning evidence for all four models."""
+    metadata = json.loads(TUNING_METADATA_PATH.read_text(encoding="utf-8"))
+    summary = pd.read_csv(TUNING_SUMMARY_PATH).set_index("Model")
+    candidates = pd.read_csv(TUNING_CANDIDATES_PATH)
+    selected = pd.read_csv(TUNED_CV_RESULTS_PATH).set_index("Model")
+    if metadata.get("status") != "complete" or metadata.get("folds") != 5:
+        raise ValueError("Current tuning metadata is incomplete or has an unexpected fold count.")
+    if metadata.get("frozen_configuration_sha256") != final_tuned_params_sha256():
+        raise ValueError("Current tuning evidence does not match the frozen model configuration.")
+    if set(summary.index) != set(FINAL_MODELS) or set(selected.index) != set(FINAL_MODELS):
+        raise ValueError("Current tuning artifacts do not cover the four submitted models.")
+    if set(candidates["Model"]) != set(FINAL_MODELS):
+        raise ValueError("Current tuning candidates do not cover the four submitted models.")
     details: dict[str, dict] = {}
     for model_name in FINAL_MODELS:
-        final_parameters = _final_model_parameters(model_name)
-        search_space = (
-            _literal_assignment(TUNING_SEARCH_PATHS[model_name], "SEARCH_SPACE")
-            if model_name in TUNING_SEARCH_PATHS
-            else {}
-        )
-        historical_selected = historical.get("parameters", {}).get(model_name, {})
-        search_rows = []
-        for parameter, values in search_space.items():
-            search_rows.append(
-                {
-                    "Hyperparameter": parameter,
-                    "Values Tested": _display_value(values),
-                    "Selected Value": _display_value(historical_selected.get(parameter, "Not recorded")),
-                }
-            )
-        searched_model_names = {
-            parameter.removeprefix("model__")
-            for parameter in search_space
-            if parameter.startswith("model__")
-        }
+        tuned_parameters = metadata["selected_parameters"][model_name]
+        search_space = metadata["search_spaces"][model_name]
+        summary_row = summary.loc[model_name]
+        selected_row = selected.loc[model_name]
+        search_rows = [
+            {
+                "Hyperparameter": parameter,
+                "Values Tested": _display_value(values),
+                "Selected Value": _display_value(tuned_parameters[parameter]),
+            }
+            for parameter, values in search_space.items()
+        ]
         final_rows = [
             {
                 "Hyperparameter": parameter,
                 "Final Value": _display_value(value),
-                "Status": (
-                    "Previously searched; current frozen value"
-                    if parameter in searched_model_names
-                    else "Fixed model parameter"
-                ),
+                "Status": "Selected by current formal tuning",
             }
-            for parameter, value in final_parameters.items()
+            for parameter, value in tuned_parameters.items()
         ]
+        before_after = pd.DataFrame(
+            [
+                {
+                    "Metric": "RMSE",
+                    "Before": summary_row["Pre_Tuning_RMSE_RM"],
+                    "After": summary_row["Tuned_RMSE_RM"],
+                    "Change": summary_row["Tuned_RMSE_RM"] - summary_row["Pre_Tuning_RMSE_RM"],
+                },
+                {
+                    "Metric": "MAE",
+                    "Before": summary_row["Pre_Tuning_MAE_RM"],
+                    "After": summary_row["Tuned_MAE_RM"],
+                    "Change": summary_row["Tuned_MAE_RM"] - summary_row["Pre_Tuning_MAE_RM"],
+                },
+                {
+                    "Metric": "R²",
+                    "Before": summary_row["Pre_Tuning_R2"],
+                    "After": summary_row["Tuned_R2"],
+                    "Change": summary_row["R2_Change"],
+                },
+                {
+                    "Metric": "Adjusted R²",
+                    "Before": summary_row["Pre_Tuning_Adjusted_R2"],
+                    "After": summary_row["Tuned_Adjusted_R2"],
+                    "Change": summary_row["Adjusted_R2_Change"],
+                },
+            ]
+        )
         details[model_name] = {
-            "search_space": pd.DataFrame(
-                search_rows,
-                columns=["Hyperparameter", "Values Tested", "Selected Value"],
-            ),
+            "search_space": pd.DataFrame(search_rows),
             "final_parameters": pd.DataFrame(final_rows),
+            "before_after": before_after,
             "method": (
-                f"Historical {historical['search']} with "
-                f"{historical['iterations'].get(model_name, 'unrecorded')} sampled candidates."
-                if model_name in TUNING_SEARCH_PATHS
-                else "No formal LightGBM search-space or tuning-run artifact is saved; the displayed configuration is fixed in the final builder."
+                f"{metadata['search_method'][model_name]} with "
+                f"{int(metadata['candidate_counts'][model_name])} candidate configurations."
             ),
-            "validation": (
-                "Historical tuning used a shuffled 5-fold KFold on the 80% portion of a "
-                "seed-42 train/test split. It predates Scenario B and was not group-safe. "
-                "The final scope metrics above use the later Scenario B group-safe 5-fold evaluation."
-                if model_name in TUNING_SEARCH_PATHS
-                else "No separate LightGBM tuning validation is recorded. Final model validation uses the saved Scenario B group-safe 5-fold framework."
-            ),
+            "validation": metadata["validation"],
+            "scaling": metadata["scaling_policy"][model_name],
+            "candidate_count": int(metadata["candidate_counts"][model_name]),
+            "tuned_metrics": {
+                "RMSE_RM": float(selected_row["CV_RMSE_RM"]),
+                "MAE_RM": float(selected_row["CV_MAE_RM"]),
+                "R2": float(selected_row["CV_R2"]),
+                "Adjusted_R2": float(selected_row["CV_Adjusted_R2"]),
+            },
         }
     return details
 
@@ -699,7 +731,7 @@ def render_scope_comparison() -> None:
     selected_scope = st.selectbox(
         "Select Market Scope",
         list(MARKET_SCOPE_OPTIONS),
-        index=5,
+        index=list(MARKET_SCOPE_OPTIONS).index("10%"),
         key="comparison_market_scope",
     )
     selected_metric = st.selectbox(
@@ -752,8 +784,8 @@ def render_scope_comparison() -> None:
     else:
         st.dataframe(tuning["search_space"], width="stretch", hide_index=True)
         st.caption(
-            "The selected values in this table come from the historical randomized-search "
-            "artifact; the deployed values are the current final-builder settings below."
+            "The selected values come from the current formal Scenario B tuning artifacts "
+            "and are used by the final model builders."
         )
     st.write("#### Selected / Final Hyperparameters")
     st.dataframe(tuning["final_parameters"], width="stretch", hide_index=True)
@@ -761,10 +793,8 @@ def render_scope_comparison() -> None:
     st.write(tuning["method"])
     st.write("#### Validation Method")
     st.write(tuning["validation"])
-    st.caption(
-        "No before-versus-after table is shown because the repository does not contain "
-        "comparable baseline and tuned metrics from the same population and validation split."
-    )
+    st.write("#### Before vs After Hyperparameter Tuning")
+    st.dataframe(tuning["before_after"], width="stretch", hide_index=True)
 
 
 def render_scope_comparison_v2() -> None:
@@ -774,7 +804,7 @@ def render_scope_comparison_v2() -> None:
     selected_scope = st.selectbox(
         "Select Market Scope",
         list(MARKET_SCOPE_OPTIONS),
-        index=5,
+        index=list(MARKET_SCOPE_OPTIONS).index("10%"),
         key="comparison_market_scope",
     )
     selected_metric = st.selectbox(
@@ -826,8 +856,8 @@ def render_scope_comparison_v2() -> None:
     else:
         st.dataframe(tuning["search_space"], width="stretch", hide_index=True)
         st.caption(
-            "Selected values here come from the historical randomized-search artifact; "
-            "deployed values are the current final-builder settings below."
+            "Selected values come from the current formal Scenario B tuning artifacts "
+            "and are used by the final model builders."
         )
     st.write("#### Selected / Final Hyperparameters")
     st.dataframe(tuning["final_parameters"], width="stretch", hide_index=True)
@@ -835,10 +865,8 @@ def render_scope_comparison_v2() -> None:
     st.write(tuning["method"])
     st.write("#### Validation Method")
     st.write(tuning["validation"])
-    st.caption(
-        "No before-versus-after table is shown because no comparable baseline and tuned "
-        "metrics exist for the same population and validation split."
-    )
+    st.write("#### Before vs After Hyperparameter Tuning")
+    st.dataframe(tuning["before_after"], width="stretch", hide_index=True)
 
 
 def render_model_evaluation(selected_scope: str, selected_metric: str) -> None:
@@ -901,24 +929,38 @@ def render_model_evaluation(selected_scope: str, selected_metric: str) -> None:
             key="tuning_model",
         )
         tuning = load_tuning_details()[selected_model]
+        st.info(f"Scaling: {tuning['scaling']}")
+        st.caption(
+            f"Candidate configurations evaluated: {tuning['candidate_count']}. "
+            "Primary selection metric: reconstructed total-price RMSE."
+        )
         st.write("#### Hyperparameter Search Space")
-        if tuning["search_space"].empty:
-            st.info(
-                "No formal search-space artifact is saved for this model. The fixed "
-                "final configuration is shown without claiming a tuning search."
-            )
-        else:
-            st.dataframe(tuning["search_space"], width="stretch", hide_index=True)
+        st.dataframe(tuning["search_space"], width="stretch", hide_index=True)
         st.write("#### Selected / Final Hyperparameters")
         st.dataframe(tuning["final_parameters"], width="stretch", hide_index=True)
+        st.write("#### Before vs After Hyperparameter Tuning")
+        before_after = tuning["before_after"].copy()
+        before_after[["Before", "After", "Change"]] = before_after[
+            ["Before", "After", "Change"]
+        ].astype(object)
+        for index, row in before_after.iterrows():
+            if row["Metric"] in {"RMSE", "MAE"}:
+                before_after.loc[index, "Before"] = f"RM {row['Before']:,.0f}"
+                before_after.loc[index, "After"] = f"RM {row['After']:,.0f}"
+                before_after.loc[index, "Change"] = f"RM {row['Change']:+,.0f}"
+            else:
+                before_after.loc[index, "Before"] = f"{row['Before']:.4f}"
+                before_after.loc[index, "After"] = f"{row['After']:.4f}"
+                before_after.loc[index, "Change"] = f"{row['Change']:+.4f}"
+        st.dataframe(before_after, width="stretch", hide_index=True)
+        st.caption(
+            "For RMSE and MAE, a negative change is better. For R² and adjusted R², "
+            "a positive change is better."
+        )
         st.write("#### Tuning Method")
         st.write(tuning["method"])
         st.write("#### Validation Method")
         st.write(tuning["validation"])
-        st.caption(
-            "No before-versus-after table is shown because no comparable baseline and "
-            "tuned metrics exist for the same population and validation split."
-        )
 
 
 def render_feature_importance(
@@ -981,9 +1023,9 @@ def render_actual_vs_predicted(
             )
         metrics = scope_rows.loc[selected]
         plot, metadata = actual_vs_predicted_plot_frame(
-            load_oof_predictions(),
+            load_all_models_trimming_oof(),
             selected,
-            float(selected_trim.removesuffix("%")),
+            selected_trim,
         )
     except (AssertionError, KeyError, ValueError) as error:
         st.error(str(error))
@@ -1021,8 +1063,8 @@ def render_actual_vs_predicted(
     )
     st.plotly_chart(figure, width="stretch")
     st.caption(
-        "Every point is a saved Scenario B out-of-fold prediction. "
-        f"{selected_trim} upper-tail trimming is applied using actual listing price. "
+        "Every point is a saved Scenario B out-of-fold prediction from the matching "
+        f"{selected_trim} retrained restricted-market experiment. "
         f"Displayed listings: {len(plot):,}."
     )
     with st.expander("Market Scope Details"):
@@ -1055,43 +1097,42 @@ def render_actual_vs_predicted(
 def actual_vs_predicted_plot_frame(
     oof: pd.DataFrame,
     model_name: str,
-    trim_level: float,
+    trim_level: str,
 ) -> tuple[pd.DataFrame, dict[str, float | int | str | None]]:
-    """Return validated saved OOF points for one authoritative market scope."""
-    if model_name not in PREDICTION_COLUMNS:
+    """Return matching retrained restricted-market OOF points for one scope."""
+    if model_name not in FINAL_MODELS:
         raise ValueError(f"Unknown model for saved OOF predictions: {model_name}")
-
-    prediction_column = PREDICTION_COLUMNS[model_name]
-    required = {"listing_id", "actual_price", "scenario_b_fold", prediction_column}
+    if trim_level not in MARKET_SCOPE_OPTIONS:
+        raise ValueError(f"Unknown trimming level for saved OOF predictions: {trim_level}")
+    required = {
+        "Model",
+        "Trim_Level",
+        "listing_id",
+        "scenario_b_fold",
+        "actual_price_RM",
+        "predicted_price_RM",
+    }
     missing = sorted(required.difference(oof.columns))
     if missing:
-        raise ValueError(
-            f"Saved OOF predictions for {model_name} are missing columns: {missing}"
-        )
+        raise ValueError(f"Saved scope-specific OOF data is missing columns: {missing}")
 
-    metadata = get_trim_market_metadata(trim_level)
-    if len(oof) != metadata["original_rows"]:
-        raise ValueError(
-            f"Saved OOF predictions contain {len(oof):,} rows, but the authoritative "
-            f"trimming experiment requires {metadata['original_rows']:,}."
-        )
-
-    actual = pd.to_numeric(oof["actual_price"], errors="coerce")
-    predicted = pd.to_numeric(oof[prediction_column], errors="coerce")
+    metadata = get_trim_market_metadata(float(trim_level.removesuffix("%")))
+    retained = oof.loc[
+        oof["Model"].eq(model_name) & oof["Trim_Level"].eq(trim_level)
+    ].copy()
+    if retained.empty:
+        raise ValueError(f"No saved OOF predictions exist for {model_name}, {trim_level}.")
+    if retained["listing_id"].duplicated().any():
+        raise ValueError(f"Saved OOF predictions contain duplicate listings for {model_name}, {trim_level}.")
+    actual = pd.to_numeric(retained["actual_price_RM"], errors="coerce")
+    predicted = pd.to_numeric(retained["predicted_price_RM"], errors="coerce")
     if not (
         np.isfinite(actual.to_numpy(float)).all()
         and np.isfinite(predicted.to_numpy(float)).all()
     ):
         raise ValueError("Saved actual and OOF predicted prices must all be finite.")
-
-    retained = oof.copy()
-    retained["actual_price"] = actual
-    retained[prediction_column] = predicted
-    cutoff = metadata["cutoff_RM"]
-    if cutoff is not None:
-        retained = retained.loc[retained["actual_price"].le(float(cutoff))].copy()
-    if retained.empty:
-        raise ValueError(f"{metadata['trim_label']} trimming retained no OOF listings.")
+    retained["actual_price_RM"] = actual
+    retained["predicted_price_RM"] = predicted
     if len(retained) != metadata["retained_rows"]:
         raise ValueError(
             f"{metadata['trim_label']} trimming retained {len(retained):,} OOF rows; "
@@ -1100,8 +1141,8 @@ def actual_vs_predicted_plot_frame(
 
     plot = retained.rename(
         columns={
-            "actual_price": "Actual Price (RM)",
-            prediction_column: "OOF Predicted Price (RM)",
+            "actual_price_RM": "Actual Price (RM)",
+            "predicted_price_RM": "OOF Predicted Price (RM)",
         }
     )
     return plot, metadata
@@ -1231,22 +1272,39 @@ def build_trimmed_metric_chart(summary: pd.DataFrame, metric_name: str) -> go.Fi
 
 
 def render_outlier_trimming() -> None:
+    metadata, tables = load_trimming_results()
+    recommended_trimming = str(metadata["recommended_trimming"])
     st.header("Outlier & Trimming Study")
-    st.success("Final Full-Market Decision: 0% Upper-Tail Trimming")
+    st.success(
+        f"Final Full-Market Decision: {recommended_trimming} Upper-Tail Trimming"
+    )
+    if recommended_trimming == "0%":
+        recommendation_evidence = (
+            "The regenerated training-only experiment did not support removing "
+            "valid upper-tail listings."
+        )
+        production_population = "Final full-market modelling retains valid premium observations."
+    else:
+        recommendation_evidence = (
+            f"The regenerated training-only experiment supports {recommended_trimming} "
+            "upper-tail trimming."
+        )
+        production_population = (
+            f"The saved production recommendation uses the {recommended_trimming} population."
+        )
     st.markdown(
-        "- ✓ Invalid and impossible observations are removed.\n"
-        "- ✓ Duplicate records are removed.\n"
-        "- ✓ Valid premium listings are retained.\n"
-        "- ✓ Training-only trimming worsened premium prediction.\n"
-        "- ✓ Restricted-market trimming remains an experiment.\n"
-        "- ✓ Final full-market modelling retains valid premium observations."
+        "- Invalid and impossible observations are removed.\n"
+        "- Duplicate records are removed.\n"
+        "- Valid premium listings remain distinct from invalid observations.\n"
+        f"- {recommendation_evidence}\n"
+        "- Restricted-market trimming remains a separate experiment.\n"
+        f"- {production_population}"
     )
     st.info(
         "The 10% default used by interactive tools is an experimental restricted-market "
-        "scope. It does not replace the official 0% full-market strategy."
+        f"scope. It does not replace the official {recommended_trimming} full-market strategy."
     )
 
-    metadata, tables = load_trimming_results()
     training = tables["training_only_comparison"]
     distribution = tables["distribution_shift"]
     bootstrap = tables["bootstrap_results"]
@@ -2042,9 +2100,11 @@ def main() -> None:
     elif view == DIAGNOSTICS_VIEW:
         render_model_diagnostics(load_comparison())
     elif view == OUTLIER_VIEW:
+        outlier_metadata, _ = load_trimming_results()
+        recommended_trimming = str(outlier_metadata["recommended_trimming"])
         st.sidebar.write("### OUTLIER STUDY")
         st.sidebar.info(
-            "Final strategy: 0% upper-tail trimming\n\n"
+            f"Final strategy: {recommended_trimming} upper-tail trimming\n\n"
             "Canonical market: 3,791 listings\n\n"
             "PPSF plausibility: RM 50–RM 5,000"
         )

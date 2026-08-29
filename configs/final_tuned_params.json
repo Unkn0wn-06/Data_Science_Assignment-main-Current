@@ -1,0 +1,75 @@
+{
+  "metadata": {
+    "generated_at": "2026-08-29T16:53:09.455470+00:00",
+    "random_state": 42,
+    "validation": "Scenario B group-safe 5-fold cross-validation",
+    "scoring": "Total-price RMSE primary; MAE secondary; R2 supporting evidence",
+    "target_strategy": "Fit PPSF and reconstruct total property price before scoring",
+    "dataset_rows": 3791,
+    "dataset_path": "data/processed/enhanced_city_dataset.csv",
+    "dataset_sha256": "4a295007fc5fdf6def33a612797606dfb60d811e7b19ade930466033a1fd66cf",
+    "fold_assignments_path": "experiments/repeat_group_sensitivity/scenario_b_fold_assignments.csv",
+    "fold_assignments_sha256": "51c887769977f2114cf2828c8dc88001291aa350f641258d68316303d70bb4a2",
+    "scaling_policy": {
+      "Ridge Regression": "StandardScaler applied to numerical features",
+      "Random Forest": "Not applied \u2014 tree-based model",
+      "Gradient Boosting": "Not applied \u2014 tree-based model",
+      "LightGBM + Position Features": "Not applied \u2014 tree-based model"
+    }
+  },
+  "models": {
+    "Ridge Regression": {
+      "parameters": {
+        "alpha": 1000.0
+      },
+      "scaling": "StandardScaler applied to numerical features"
+    },
+    "Random Forest": {
+      "parameters": {
+        "bootstrap": true,
+        "criterion": "poisson",
+        "max_depth": 30,
+        "max_features": 0.5,
+        "min_samples_leaf": 3,
+        "min_samples_split": 2,
+        "n_estimators": 1200,
+        "n_jobs": -1,
+        "random_state": 42
+      },
+      "scaling": "Not applied \u2014 tree-based model"
+    },
+    "Gradient Boosting": {
+      "parameters": {
+        "learning_rate": 0.07,
+        "loss": "huber",
+        "max_depth": 6,
+        "max_features": null,
+        "min_samples_leaf": 5,
+        "min_samples_split": 6,
+        "n_estimators": 400,
+        "random_state": 42,
+        "subsample": 1.0
+      },
+      "scaling": "Not applied \u2014 tree-based model"
+    },
+    "LightGBM + Position Features": {
+      "parameters": {
+        "colsample_bytree": 0.6,
+        "learning_rate": 0.02,
+        "max_depth": 10,
+        "min_child_samples": 10,
+        "n_estimators": 1200,
+        "n_jobs": -1,
+        "num_leaves": 95,
+        "objective": "regression",
+        "random_state": 42,
+        "reg_alpha": 0.1,
+        "reg_lambda": 5.0,
+        "subsample": 0.9,
+        "subsample_freq": 1,
+        "verbosity": -1
+      },
+      "scaling": "Not applied \u2014 tree-based model"
+    }
+  }
+}

@@ -109,8 +109,6 @@ def validate_source() -> tuple[dict, dict[str, str]]:
         raise ValueError("Trimming experiment does not use 3,791 canonical rows.")
     if source_result["validation"]["scenario"] != "B":
         raise ValueError("Trimming experiment does not use Scenario B.")
-    if source_result["recommended_trim_level"] != "A":
-        raise ValueError("Verified trimming recommendation is not the 0% baseline.")
     if source_result["production_model_changed"]:
         raise ValueError("Source metadata unexpectedly reports a production-model change.")
     if not source_result["production_safety"]["all_protected_files_unchanged"]:
@@ -133,12 +131,13 @@ def validate_source() -> tuple[dict, dict[str, str]]:
         raise ValueError("Primary LightGBM trimming results are incomplete.")
     if not (primary["OOF_Rows"].astype(int) == EXPECTED_ROWS).all():
         raise ValueError("Training-only results do not retain all validation rows.")
-    nonzero = primary[primary["Removal_Percent"] > 0]
-    if not (
-        (nonzero["RMSE_Change_vs_0_RM"] > 0)
-        & (nonzero["MAE_Change_vs_0_RM"] > 0)
-    ).all():
-        raise ValueError("Saved results do not support the verified 0% decision.")
+    if source_result["recommended_trim_level"] == "A":
+        nonzero = primary[primary["Removal_Percent"] > 0]
+        if not (
+            (nonzero["RMSE_Change_vs_0_RM"] > 0)
+            & (nonzero["MAE_Change_vs_0_RM"] > 0)
+        ).all():
+            raise ValueError("Saved metrics do not support the experiment's 0% decision.")
 
     hashes = {
         name: sha256(SOURCE_DIR / name)
@@ -267,6 +266,13 @@ def build_results() -> dict:
         RETAINED_CV_FILENAME: sha256(OUTPUT_DIR / RETAINED_CV_FILENAME),
     }
 
+    recommended_level = source_result["recommended_trim_level"]
+    level_to_percent = {
+        row["level"]: float(row["upper_tail_removed_percent"])
+        for row in source_result["trimming_levels"]
+    }
+    recommended_percent = level_to_percent[recommended_level]
+    recommended_label = f"{recommended_percent:g}%"
     metadata = {
         "canonical_rows": EXPECTED_ROWS,
         "canonical_dataset": CANONICAL_PATH.relative_to(PROJECT_ROOT).as_posix(),
@@ -275,10 +281,14 @@ def build_results() -> dict:
         "scenario_b_fold_assignments": FOLD_PATH.relative_to(PROJECT_ROOT).as_posix(),
         "scenario_b_fold_assignments_sha256": sha256(FOLD_PATH),
         "trim_levels_percent": TRIM_LEVELS,
-        "recommended_trimming": "0%",
-        "recommended_trim_level": "A",
-        "decision": "Do not adopt upper-tail trimming",
-        "production_model": "LightGBM + Position Features",
+        "recommended_trimming": recommended_label,
+        "recommended_trim_level": recommended_level,
+        "decision": (
+            "Do not adopt upper-tail trimming"
+            if recommended_percent == 0.0
+            else f"Adopt {recommended_label} upper-tail trimming"
+        ),
+        "production_model": source_result["methodology"]["primary_model"],
         "production_model_changed": False,
         "target": "PPSF",
         "evaluation_unit": "reconstructed total RM price",

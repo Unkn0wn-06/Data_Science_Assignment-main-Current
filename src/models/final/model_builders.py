@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from lightgbm import LGBMRegressor
@@ -19,29 +23,58 @@ from src.models.final.structured_features import (
 )
 
 
-def build_standard_ppsf_estimator(model_name: str) -> PricePerSquareFootRegressor:
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+FINAL_TUNED_PARAMS_PATH = PROJECT_ROOT / "configs" / "final_tuned_params.json"
+MODEL_SCALING_POLICY = {
+    "Ridge Regression": "StandardScaler applied to numerical features",
+    "Random Forest": "Not applied — tree-based model",
+    "Gradient Boosting": "Not applied — tree-based model",
+    "LightGBM + Position Features": "Not applied — tree-based model",
+}
+def load_final_tuned_config(path: Path = FINAL_TUNED_PARAMS_PATH) -> dict:
+    """Load and validate the authoritative current four-model configuration."""
+    if not path.is_file():
+        raise FileNotFoundError(f"Authoritative tuned configuration is missing: {path}")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    models = payload.get("models", {})
+    if set(models) != set(MODEL_SCALING_POLICY):
+        raise ValueError("Tuned configuration must contain the current four model families.")
+    for model_name, spec in models.items():
+        if not isinstance(spec.get("parameters"), dict) or not spec["parameters"]:
+            raise ValueError(f"Tuned parameters are missing for {model_name}.")
+        if spec.get("scaling") != MODEL_SCALING_POLICY[model_name]:
+            raise ValueError(f"Scaling policy mismatch for {model_name}.")
+    return payload
+
+
+def get_final_model_parameters(model_name: str) -> dict:
+    """Return a defensive copy of one frozen tuned parameter mapping."""
+    if model_name not in MODEL_SCALING_POLICY:
+        raise KeyError(f"Unknown final model: {model_name}")
+    return dict(load_final_tuned_config()["models"][model_name]["parameters"])
+
+
+def final_tuned_params_sha256(path: Path = FINAL_TUNED_PARAMS_PATH) -> str:
+    """Fingerprint the tuned configuration for application cache invalidation."""
+    if not path.is_file():
+        raise FileNotFoundError(f"Authoritative tuned configuration is missing: {path}")
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def build_standard_ppsf_estimator(
+    model_name: str,
+    parameters: dict | None = None,
+) -> PricePerSquareFootRegressor:
     """Build the exact frozen Ridge, RF, or GB Scenario B pipeline."""
+    selected = get_final_model_parameters(model_name) if parameters is None else dict(parameters)
     if model_name == "Ridge Regression":
-        estimator, scale = Ridge(alpha=10.0), True
+        estimator, scale = Ridge(**selected), True
     elif model_name == "Random Forest":
-        estimator, scale = RandomForestRegressor(
-            n_estimators=700,
-            min_samples_split=6,
-            min_samples_leaf=3,
-            max_features=0.7,
-            max_depth=24,
-            criterion="squared_error",
-            bootstrap=True,
-            random_state=42,
-            n_jobs=-1,
-        ), False
+        selected.update(bootstrap=True, random_state=42, n_jobs=-1)
+        estimator, scale = RandomForestRegressor(**selected), False
     elif model_name == "Gradient Boosting":
-        estimator, scale = GradientBoostingRegressor(
-            random_state=42,
-            learning_rate=0.1,
-            max_depth=5,
-            n_estimators=200,
-        ), False
+        selected.update(random_state=42)
+        estimator, scale = GradientBoostingRegressor(**selected), False
     else:
         raise KeyError(f"Unknown final standard model: {model_name}")
     pipeline = Pipeline(
@@ -60,7 +93,19 @@ def build_standard_ppsf_estimator(model_name: str) -> PricePerSquareFootRegresso
     return PricePerSquareFootRegressor(regressor=pipeline)
 
 
-def build_position_lightgbm():
+def build_position_lightgbm(parameters: dict | None = None):
+    selected = (
+        get_final_model_parameters("LightGBM + Position Features")
+        if parameters is None
+        else dict(parameters)
+    )
+    selected.update(
+        random_state=42,
+        n_jobs=-1,
+        verbosity=-1,
+        objective="regression",
+    )
+    selected["subsample_freq"] = 1 if float(selected.get("subsample", 1.0)) < 1.0 else 0
     numerical, categorical = engineered_feature_lists(
         NUMERICAL_FEATURES, CATEGORICAL_FEATURES
     )
@@ -81,22 +126,7 @@ def build_position_lightgbm():
             ),
             (
                 "model",
-                LGBMRegressor(
-                    n_estimators=1000,
-                    learning_rate=0.03,
-                    num_leaves=31,
-                    max_depth=-1,
-                    min_child_samples=20,
-                    subsample=0.8,
-                    subsample_freq=1,
-                    colsample_bytree=0.8,
-                    reg_alpha=0.1,
-                    reg_lambda=1.0,
-                    random_state=42,
-                    n_jobs=-1,
-                    verbosity=-1,
-                    objective="regression",
-                ),
+                LGBMRegressor(**selected),
             ),
         ]
     )
@@ -118,9 +148,10 @@ def fit_position_fold(
     X_validation,
     train_position,
     validation_position,
+    parameters: dict | None = None,
 ):
     """Fit one frozen LightGBM PPSF outer fold and reconstruct total price."""
-    estimator, numerical, categorical = build_position_lightgbm()
+    estimator, numerical, categorical = build_position_lightgbm(parameters)
     train = prepare_position_features(X_train, train_position)
     validation = prepare_position_features(X_validation, validation_position)
     train_size = pd.to_numeric(

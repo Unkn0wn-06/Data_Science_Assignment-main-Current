@@ -1,0 +1,288 @@
+{
+  "generated_at": "2026-08-29T16:53:09.455470+00:00",
+  "status": "complete",
+  "search_method": {
+    "Ridge Regression": "31-value logarithmic grid",
+    "Random Forest": "Bounded ParameterSampler",
+    "Gradient Boosting": "Bounded ParameterSampler",
+    "LightGBM + Position Features": "Bounded ParameterSampler"
+  },
+  "candidate_counts": {
+    "Ridge Regression": 31,
+    "Random Forest": 50,
+    "Gradient Boosting": 60,
+    "LightGBM + Position Features": 80
+  },
+  "search_spaces": {
+    "Ridge Regression": {
+      "alpha": [
+        0.001,
+        0.001584893192461114,
+        0.0025118864315095794,
+        0.003981071705534973,
+        0.00630957344480193,
+        0.01,
+        0.01584893192461114,
+        0.025118864315095808,
+        0.039810717055349734,
+        0.06309573444801933,
+        0.1,
+        0.15848931924611143,
+        0.25118864315095824,
+        0.3981071705534973,
+        0.6309573444801936,
+        1.0,
+        1.584893192461114,
+        2.5118864315095824,
+        3.981071705534973,
+        6.309573444801936,
+        10.0,
+        15.848931924611142,
+        25.11886431509582,
+        39.81071705534978,
+        63.09573444801943,
+        100.0,
+        158.48931924611142,
+        251.18864315095823,
+        398.1071705534977,
+        630.9573444801943,
+        1000.0
+      ]
+    },
+    "Random Forest": {
+      "n_estimators": [
+        300,
+        500,
+        700,
+        900,
+        1200
+      ],
+      "max_depth": [
+        null,
+        12,
+        16,
+        20,
+        24,
+        30
+      ],
+      "min_samples_split": [
+        2,
+        4,
+        6,
+        8,
+        10
+      ],
+      "min_samples_leaf": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "max_features": [
+        0.5,
+        0.7,
+        0.8,
+        0.9,
+        1.0,
+        "sqrt"
+      ],
+      "criterion": [
+        "squared_error",
+        "poisson"
+      ]
+    },
+    "Gradient Boosting": {
+      "n_estimators": [
+        100,
+        150,
+        200,
+        250,
+        300,
+        400
+      ],
+      "learning_rate": [
+        0.02,
+        0.03,
+        0.05,
+        0.07,
+        0.1
+      ],
+      "max_depth": [
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "min_samples_split": [
+        2,
+        4,
+        6,
+        8
+      ],
+      "min_samples_leaf": [
+        1,
+        2,
+        3,
+        5
+      ],
+      "subsample": [
+        0.7,
+        0.8,
+        0.9,
+        1.0
+      ],
+      "max_features": [
+        null,
+        0.7,
+        0.9,
+        "sqrt"
+      ],
+      "loss": [
+        "squared_error",
+        "huber"
+      ]
+    },
+    "LightGBM + Position Features": {
+      "n_estimators": [
+        500,
+        800,
+        1000,
+        1200,
+        1500,
+        2000
+      ],
+      "learning_rate": [
+        0.01,
+        0.02,
+        0.03,
+        0.05,
+        0.08
+      ],
+      "num_leaves": [
+        15,
+        31,
+        47,
+        63,
+        95
+      ],
+      "max_depth": [
+        -1,
+        6,
+        8,
+        10,
+        12
+      ],
+      "min_child_samples": [
+        10,
+        20,
+        30,
+        40,
+        60
+      ],
+      "subsample": [
+        0.7,
+        0.8,
+        0.9,
+        1.0
+      ],
+      "colsample_bytree": [
+        0.6,
+        0.7,
+        0.8,
+        0.9,
+        1.0
+      ],
+      "reg_alpha": [
+        0.0,
+        0.05,
+        0.1,
+        0.5,
+        1.0
+      ],
+      "reg_lambda": [
+        0.0,
+        0.5,
+        1.0,
+        2.0,
+        5.0
+      ]
+    }
+  },
+  "validation": "Scenario B group-safe cross-validated tuning results",
+  "folds": 5,
+  "random_state": 42,
+  "primary_metric": "total property price RMSE in RM",
+  "secondary_metric": "total property price MAE in RM",
+  "adjusted_r2_optimised": false,
+  "dataset_path": "data/processed/enhanced_city_dataset.csv",
+  "dataset_sha256": "4a295007fc5fdf6def33a612797606dfb60d811e7b19ade930466033a1fd66cf",
+  "dataset_rows": 3791,
+  "fold_assignments_path": "experiments/repeat_group_sensitivity/scenario_b_fold_assignments.csv",
+  "fold_assignments_sha256": "51c887769977f2114cf2828c8dc88001291aa350f641258d68316303d70bb4a2",
+  "repeat_groups_crossing_folds": 0,
+  "scaling_policy": {
+    "Ridge Regression": "StandardScaler applied to numerical features",
+    "Random Forest": "Not applied \u2014 tree-based model",
+    "Gradient Boosting": "Not applied \u2014 tree-based model",
+    "LightGBM + Position Features": "Not applied \u2014 tree-based model"
+  },
+  "selected_parameters": {
+    "Ridge Regression": {
+      "alpha": 1000.0
+    },
+    "Random Forest": {
+      "bootstrap": true,
+      "criterion": "poisson",
+      "max_depth": 30,
+      "max_features": 0.5,
+      "min_samples_leaf": 3,
+      "min_samples_split": 2,
+      "n_estimators": 1200,
+      "n_jobs": -1,
+      "random_state": 42
+    },
+    "Gradient Boosting": {
+      "learning_rate": 0.07,
+      "loss": "huber",
+      "max_depth": 6,
+      "max_features": null,
+      "min_samples_leaf": 5,
+      "min_samples_split": 6,
+      "n_estimators": 400,
+      "random_state": 42,
+      "subsample": 1.0
+    },
+    "LightGBM + Position Features": {
+      "colsample_bytree": 0.6,
+      "learning_rate": 0.02,
+      "max_depth": 10,
+      "min_child_samples": 10,
+      "n_estimators": 1200,
+      "n_jobs": -1,
+      "num_leaves": 95,
+      "objective": "regression",
+      "random_state": 42,
+      "reg_alpha": 0.1,
+      "reg_lambda": 5.0,
+      "subsample": 0.9,
+      "subsample_freq": 1,
+      "verbosity": -1
+    }
+  },
+  "frozen_configuration_sha256": "b948e9f5c3f3dcfd5ee78f9285b60f9c0bfb98fe2f6461a1e7b621fb9b638ad5",
+  "artifacts": {
+    "pre_tuning_model_comparison": "results/tuning/pre_tuning_model_comparison.csv",
+    "tuning_candidates": "results/tuning/tuning_candidates.csv",
+    "tuned_cv_results": "results/tuning/tuned_cv_results.csv",
+    "tuning_summary": "results/tuning/tuning_summary.csv",
+    "frozen_configuration": "configs/final_tuned_params.json"
+  },
+  "versions": {
+    "python": "3.14.0",
+    "pandas": "3.0.3",
+    "scikit_learn": "1.9.0",
+    "lightgbm": "4.7.0"
+  }
+}

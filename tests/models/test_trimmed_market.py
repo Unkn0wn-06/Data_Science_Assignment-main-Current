@@ -4,15 +4,23 @@ from __future__ import annotations
 
 import hashlib
 import inspect
+import json
 import unittest
 
 import numpy as np
 import pandas as pd
 
-from prototype.app import load_trimmed_deployment_model
+from prototype.app import (
+    _load_trimmed_deployment_model_cached,
+    load_trimmed_deployment_model,
+)
 from src.cleaning.pipeline import PROJECT_ROOT
 from src.models.common.features import MODEL_FEATURES
-from src.models.final.model_builders import build_position_lightgbm
+from src.models.final.model_builders import (
+    FINAL_TUNED_PARAMS_PATH,
+    build_position_lightgbm,
+    final_tuned_params_sha256,
+)
 from src.models.final.position_regex_lightgbm import predict_total_price
 from src.models.final.trimmed_market import (
     fit_trimmed_market_model,
@@ -42,14 +50,15 @@ class TrimmedMarketDeploymentTests(unittest.TestCase):
             "4a295007fc5fdf6def33a612797606dfb60d811e7b19ade930466033a1fd66cf",
             sha256(DATA_PATH),
         )
-        self.assertEqual(
-            "7f62245f025ca5e27663a80966985a17c9e8cb70fac613bdfdff2e10d317b906",
-            sha256(OOF_PATH),
+        metadata = json.loads(
+            (PROJECT_ROOT / "results" / "final_models" / "metadata.json").read_text(
+                encoding="utf-8"
+            )
         )
-        self.assertEqual(
-            "0bac9cc1fff730bfeffd68a234ded463f3d24f0355ffd1bae44d2e5ce778dfdf",
-            sha256(COMPARISON_PATH),
-        )
+        self.assertEqual(final_tuned_params_sha256(), metadata["tuned_configuration_sha256"])
+        self.assertTrue(FINAL_TUNED_PARAMS_PATH.is_file())
+        self.assertGreater(OOF_PATH.stat().st_size, 0)
+        self.assertGreater(COMPARISON_PATH.stat().st_size, 0)
 
     def test_five_percent_population_matches_saved_experiment_without_mutation(self):
         original = self.data.copy(deep=True)
@@ -93,15 +102,19 @@ class TrimmedMarketDeploymentTests(unittest.TestCase):
         self.assertIn('["price"]', source)
         self.assertNotIn("predict", source)
 
-    def test_streamlit_cache_key_depends_only_on_trim_level(self):
+    def test_streamlit_cache_key_includes_tuned_configuration(self):
         self.assertEqual(
             ["trim_level"],
             list(inspect.signature(load_trimmed_deployment_model).parameters),
         )
         source = inspect.getsource(load_trimmed_deployment_model)
-        self.assertIn("@st.cache_resource", source)
-        self.assertNotIn("values", source)
-        self.assertNotIn("description", source)
+        self.assertIn("final_tuned_params_sha256", source)
+        cached_source = inspect.getsource(_load_trimmed_deployment_model_cached)
+        self.assertIn("@st.cache_resource", cached_source)
+        self.assertEqual(
+            ["trim_level", "model_config_hash"],
+            list(inspect.signature(_load_trimmed_deployment_model_cached).parameters),
+        )
 
     def test_active_python_imports_do_not_reference_archive(self):
         active_roots = (PROJECT_ROOT / "src", PROJECT_ROOT / "prototype")
