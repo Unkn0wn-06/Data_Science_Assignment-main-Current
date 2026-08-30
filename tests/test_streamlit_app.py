@@ -27,7 +27,7 @@ from prototype.app import (
     load_scope_models,
     load_tuning_details,
     normalized_scope_display_frame,
-    predict_scope_model,
+    predict_scope_models,
     prediction_comparison_frame,
     recommended_model_for_scope,
     render_outlier_trimming,
@@ -145,7 +145,13 @@ class ScopeAwareStreamlitTests(unittest.TestCase):
         output = app.dataframe[0].value
         self.assertEqual(list(FINAL_MODELS), output["Model"].tolist())
         self.assertEqual(
-            ["Selected-Scope Prediction", "Full-Market Prediction", "Difference (RM)", "Difference (%)"],
+            [
+                "Selected-Scope Prediction",
+                "Full-Market Prediction",
+                "Difference (RM)",
+                "Difference (%)",
+                "Status",
+            ],
             list(output.columns[1:]),
         )
         np.testing.assert_array_equal(output["Difference (RM)"], np.zeros(4))
@@ -161,27 +167,33 @@ class ScopeAwareStreamlitTests(unittest.TestCase):
         self.assertEqual(list(FINAL_MODELS), list(full_models))
         self.assertEqual(list(FINAL_MODELS), list(selected_models))
 
-        full = {
-            name: predict_scope_model(
-                name, full_models[name], values, description,
-                full_models[name].description_length_median_,
-            )
-            for name in FINAL_MODELS
-        }
-        selected = {
-            name: predict_scope_model(
-                name, selected_models[name], values, description,
-                selected_models[name].description_length_median_,
-            )
-            for name in FINAL_MODELS
-        }
+        full = predict_scope_models(full_models, values, description)
+        selected = predict_scope_models(selected_models, values, description)
         output = prediction_comparison_frame(selected, full)
         self.assertEqual(list(FINAL_MODELS), output["Model"].tolist())
         self.assertEqual(
-            ["Model", "Selected-Scope Prediction", "Full-Market Prediction", "Difference (RM)", "Difference (%)"],
+            [
+                "Model",
+                "Selected-Scope Prediction",
+                "Full-Market Prediction",
+                "Difference (RM)",
+                "Difference (%)",
+                "Status",
+            ],
             list(output.columns),
         )
-        self.assertTrue(np.isfinite(output.iloc[:, 1:].to_numpy(float)).all())
+        self.assertTrue(
+            np.isfinite(
+                output[
+                    [
+                        "Selected-Scope Prediction",
+                        "Full-Market Prediction",
+                        "Difference (RM)",
+                        "Difference (%)",
+                    ]
+                ].to_numpy(float)
+            ).all()
+        )
         self.assertTrue(output["Difference (RM)"].abs().gt(0).any())
 
         zero = prediction_comparison_frame(full, full)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from pathlib import Path
 
@@ -116,6 +117,29 @@ COMPARISON_METRICS = {
     "R\u00b2": ("R2", "R\u00b2", "R\u00b2", ".4f"),
     "Adjusted R\u00b2": ("Adjusted_R2", "Adjusted R\u00b2", "Adjusted R\u00b2", ".4f"),
 }
+
+LOGGER = logging.getLogger(__name__)
+BEST_CELL_STYLE = (
+    "background-color: #14532D;"
+    "color: #FFFFFF;"
+    "font-weight: 700;"
+)
+RIDGE_UNAVAILABLE_MESSAGE = (
+    "Ridge Regression could not provide a reliable positive estimate for this input "
+    "combination. Linear models may extrapolate outside the range represented by the "
+    "training data."
+)
+GENERIC_UNAVAILABLE_MESSAGE = "Prediction unavailable for this input combination."
+LIVE_NUMERIC_FIELDS = (
+    ("property_size_sqft", "Property Size"),
+    ("bedroom", "Bedrooms"),
+    ("bathroom", "Bathrooms"),
+    ("parking_lot", "Parking Lots"),
+    ("facilities_count", "Facilities Count"),
+    ("completion_year", "Completion Year"),
+    ("number_of_floors", "Number of Floors"),
+    ("total_units", "Total Units"),
+)
 
 
 @st.cache_data
@@ -441,23 +465,114 @@ def predict_scope_model(
     }
 
 
+def _unavailable_prediction(model_name: str) -> dict:
+    message = (
+        RIDGE_UNAVAILABLE_MESSAGE
+        if model_name == "Ridge Regression"
+        else GENERIC_UNAVAILABLE_MESSAGE
+    )
+    return {"available": False, "prediction": None, "message": message}
+
+
+def safe_predict_scope_model(
+    model_name: str,
+    model: object,
+    values: dict,
+    description: str,
+) -> dict:
+    """Return one validated live result without propagating model-level failures."""
+    try:
+        result = predict_scope_model(
+            model_name,
+            model,
+            values,
+            description,
+            model.description_length_median_,
+        )
+        total_price = float(result["total_price_RM"])
+        property_size = float(values.get("property_size_sqft", np.nan))
+        if not np.isfinite(total_price) or total_price <= 0:
+            raise ValueError("Live prediction was non-positive or non-finite.")
+        if not np.isfinite(property_size) or property_size <= 0:
+            raise ValueError("Property size must be positive and finite.")
+
+        ppsf = total_price / property_size
+        if not np.isfinite(ppsf) or ppsf <= 0:
+            raise ValueError("Live PPSF was non-positive or non-finite.")
+        validated = dict(result)
+        validated["total_price_RM"] = total_price
+        validated["ppsf_RM"] = ppsf
+        return {"available": True, "prediction": validated, "message": None}
+    except Exception:
+        LOGGER.warning(
+            "%s live prediction is unavailable for the submitted input.",
+            model_name,
+            exc_info=True,
+        )
+        return _unavailable_prediction(model_name)
+
+
+def predict_scope_models(
+    models: dict[str, object],
+    values: dict,
+    description: str,
+) -> dict[str, dict]:
+    """Predict every final model independently so one failure cannot abort the rest."""
+    return {
+        model_name: safe_predict_scope_model(
+            model_name,
+            models.get(model_name),
+            values,
+            description,
+        )
+        for model_name in FINAL_MODELS
+    }
+
+
+def _prediction_total(outcome: dict) -> float | None:
+    if not outcome or not outcome.get("available") or not outcome.get("prediction"):
+        return None
+    total_price = float(outcome["prediction"]["total_price_RM"])
+    if not np.isfinite(total_price) or total_price <= 0:
+        return None
+    return total_price
+
+
+def final_model_prediction(predictions: dict[str, dict]) -> dict | None:
+    """Return only the configured final model's valid prediction; never substitute."""
+    outcome = predictions.get(FINAL_MODEL_NAME, {})
+    if not outcome.get("available"):
+        return None
+    return outcome.get("prediction")
+
+
 def prediction_comparison_frame(
     selected_predictions: dict[str, dict],
     full_market_predictions: dict[str, dict],
 ) -> pd.DataFrame:
-    """Build the required four-model selected/full-market prediction table."""
+    """Build an N/A-safe selected/full-market comparison for all model families."""
     rows = []
     for model_name in FINAL_MODELS:
-        selected = float(selected_predictions[model_name]["total_price_RM"])
-        full = float(full_market_predictions[model_name]["total_price_RM"])
-        difference = selected - full
+        selected = _prediction_total(selected_predictions.get(model_name, {}))
+        full = _prediction_total(full_market_predictions.get(model_name, {}))
+        both_available = selected is not None and full is not None
+        difference = selected - full if both_available else np.nan
+        if both_available:
+            status = "Available"
+        elif selected is not None:
+            status = "Full-market prediction unavailable"
+        elif full is not None:
+            status = "Selected-scope prediction unavailable"
+        else:
+            status = "Prediction unavailable"
         rows.append(
             {
                 "Model": model_name,
-                "Selected-Scope Prediction": selected,
-                "Full-Market Prediction": full,
+                "Selected-Scope Prediction": selected if selected is not None else np.nan,
+                "Full-Market Prediction": full if full is not None else np.nan,
                 "Difference (RM)": difference,
-                "Difference (%)": 100.0 * difference / full,
+                "Difference (%)": 100.0 * difference / full if both_available else np.nan,
+                "Status": status,
             }
         )
     return pd.DataFrame(rows)
@@ -675,6 +790,77 @@ def condition_feature_values(
     }
 
 
+def observed_numeric_ranges(data: pd.DataFrame) -> dict[str, tuple[float, float]]:
+    """Derive live-input reference ranges from the prepared modelling dataset."""
+    ranges = {}
+    for field, _ in LIVE_NUMERIC_FIELDS:
+        numeric = pd.to_numeric(data[field], errors="coerce").to_numpy(dtype=float)
+        finite = numeric[np.isfinite(numeric)]
+        if finite.size == 0:
+            raise ValueError(f"Prepared dataset has no finite values for {field}.")
+        ranges[field] = (float(finite.min()), float(finite.max()))
+    return ranges
+
+
+def validate_live_numeric_inputs(values: dict) -> list[str]:
+    """Return physical/logical validation errors that must block prediction."""
+    errors = []
+    labels = dict(LIVE_NUMERIC_FIELDS)
+    numeric = {}
+    for field, label in LIVE_NUMERIC_FIELDS:
+        try:
+            numeric[field] = float(values.get(field, np.nan))
+        except (TypeError, ValueError):
+            numeric[field] = np.nan
+        if not np.isfinite(numeric[field]):
+            errors.append(f"{label} must be a finite number.")
+
+    if errors:
+        return errors
+    if numeric["property_size_sqft"] <= 0:
+        errors.append("Property Size must be greater than zero.")
+    for field in ("bedroom", "bathroom", "parking_lot", "facilities_count"):
+        if numeric[field] < 0:
+            errors.append(f"{labels[field]} cannot be negative.")
+    if not 1800 <= numeric["completion_year"] <= 2030:
+        errors.append("Completion Year must be between 1800 and 2030.")
+    for field in ("number_of_floors", "total_units"):
+        if numeric[field] <= 0:
+            errors.append(f"{labels[field]} must be greater than zero.")
+    return errors
+
+
+def outside_observed_range_fields(
+    values: dict,
+    ranges: dict[str, tuple[float, float]],
+) -> list[str]:
+    """List logically valid inputs that require extrapolation beyond training data."""
+    outside = []
+    for field, label in LIVE_NUMERIC_FIELDS:
+        value = float(values[field])
+        minimum, maximum = ranges[field]
+        if value < minimum or value > maximum:
+            outside.append(label)
+    return outside
+
+
+def style_best_metric_cells(
+    display: pd.DataFrame,
+    formats: dict,
+    r2_label: str,
+    adjusted_r2_label: str,
+):
+    """Format a metric table with accessible, theme-independent winner styling."""
+    return (
+        display.style.format(formats)
+        .highlight_min(subset=["RMSE", "MAE"], props=BEST_CELL_STYLE)
+        .highlight_max(
+            subset=[r2_label, adjusted_r2_label],
+            props=BEST_CELL_STYLE,
+        )
+    )
+
+
 def build_official_metric_chart(table: pd.DataFrame, metric_name: str) -> go.Figure:
     """Build one full-width official comparison chart from saved metrics."""
     metric, title_metric, y_label, text_format = COMPARISON_METRICS[metric_name]
@@ -709,17 +895,16 @@ def render_comparison(payload: dict) -> None:
 
     st.subheader("Detailed Comparison Table")
     display = comparison_display_frame(payload)
-    styled = (
-        display.style.format(
-            {
-                "RMSE": "RM {:,.0f}",
-                "MAE": "RM {:,.0f}",
-                "R²": "{:.4f}",
-                "Adjusted R²": "{:.4f}",
-            }
-        )
-        .highlight_min(subset=["RMSE", "MAE"], color="#d1fae5")
-        .highlight_max(subset=["R²", "Adjusted R²"], color="#d1fae5")
+    styled = style_best_metric_cells(
+        display,
+        {
+            "RMSE": "RM {:,.0f}",
+            "MAE": "RM {:,.0f}",
+            "R²": "{:.4f}",
+            "Adjusted R²": "{:.4f}",
+        },
+        "R²",
+        "Adjusted R²",
     )
     st.dataframe(styled, width="stretch", hide_index=True)
 
@@ -747,17 +932,16 @@ def render_scope_comparison() -> None:
 
     st.subheader("Final Model Performance")
     display = scope_display_frame(summary, selected_scope)
-    styled = (
-        display.style.format(
-            {
-                "RMSE": "RM {:,.0f}",
-                "MAE": "RM {:,.0f}",
-                "R²": "{:.4f}",
-                "Adjusted R²": "{:.4f}",
-            }
-        )
-        .highlight_min(subset=["RMSE", "MAE"], color="#d1fae5")
-        .highlight_max(subset=["R²", "Adjusted R²"], color="#d1fae5")
+    styled = style_best_metric_cells(
+        display,
+        {
+            "RMSE": "RM {:,.0f}",
+            "MAE": "RM {:,.0f}",
+            "R²": "{:.4f}",
+            "Adjusted R²": "{:.4f}",
+        },
+        "R²",
+        "Adjusted R²",
     )
     st.dataframe(styled, width="stretch", hide_index=True)
     recommended = recommended_model_for_scope(summary, selected_scope)
@@ -819,17 +1003,16 @@ def render_scope_comparison_v2() -> None:
     display = normalized_scope_display_frame(summary, selected_scope)
     r2_label = "R\u00b2"
     adjusted_label = "Adjusted R\u00b2"
-    styled = (
-        display.style.format(
-            {
-                "RMSE": "RM {:,.0f}",
-                "MAE": "RM {:,.0f}",
-                r2_label: "{:.4f}",
-                adjusted_label: "{:.4f}",
-            }
-        )
-        .highlight_min(subset=["RMSE", "MAE"], color="#d1fae5")
-        .highlight_max(subset=[r2_label, adjusted_label], color="#d1fae5")
+    styled = style_best_metric_cells(
+        display,
+        {
+            "RMSE": "RM {:,.0f}",
+            "MAE": "RM {:,.0f}",
+            r2_label: "{:.4f}",
+            adjusted_label: "{:.4f}",
+        },
+        r2_label,
+        adjusted_label,
     )
     st.dataframe(styled, width="stretch", hide_index=True)
     recommended = recommended_model_for_scope(summary, selected_scope)
@@ -906,18 +1089,17 @@ def render_model_evaluation(selected_scope: str, selected_metric: str) -> None:
         ).loc[
             :, ["Model", "Retained Listings", "RMSE", "MAE", r2_label, adjusted_label]
         ]
-        styled = (
-            display.style.format(
-                {
-                    "Retained Listings": "{:,}",
-                    "RMSE": "RM {:,.0f}",
-                    "MAE": "RM {:,.0f}",
-                    r2_label: "{:.4f}",
-                    adjusted_label: "{:.4f}",
-                }
-            )
-            .highlight_min(subset=["RMSE", "MAE"], color="#d1fae5")
-            .highlight_max(subset=[r2_label, adjusted_label], color="#d1fae5")
+        styled = style_best_metric_cells(
+            display,
+            {
+                "Retained Listings": "{:,}",
+                "RMSE": "RM {:,.0f}",
+                "MAE": "RM {:,.0f}",
+                r2_label: "{:.4f}",
+                adjusted_label: "{:.4f}",
+            },
+            r2_label,
+            adjusted_label,
         )
         st.dataframe(styled, width="stretch", hide_index=True)
 
@@ -1849,40 +2031,38 @@ def render_scope_predictor(data: pd.DataFrame, selected_scope: str = "10%") -> N
         with numeric_columns[0]:
             property_size = st.number_input(
                 "Property Size (sq.ft.)",
-                min_value=1.0,
-                max_value=20_000.0,
                 value=float(data["property_size_sqft"].median()),
                 step=50.0,
             )
             bedrooms = st.number_input(
-                "Bedrooms", min_value=0.0, max_value=20.0,
+                "Bedrooms",
                 value=float(data["bedroom"].median()), step=1.0,
             )
         with numeric_columns[1]:
             bathrooms = st.number_input(
-                "Bathrooms", min_value=0.0, max_value=20.0,
+                "Bathrooms",
                 value=float(data["bathroom"].median()), step=1.0,
             )
             parking_lots = st.number_input(
-                "Parking Lots", min_value=0.0, max_value=20.0,
+                "Parking Lots",
                 value=float(data["parking_lot"].median()), step=1.0,
             )
         with numeric_columns[2]:
             facilities_count = st.number_input(
-                "Facilities Count", min_value=0, max_value=50,
+                "Facilities Count",
                 value=int(data["facilities_count"].median()), step=1,
             )
             completion_year = st.number_input(
-                "Completion Year", min_value=1800, max_value=2030,
+                "Completion Year",
                 value=int(data["completion_year"].median()), step=1,
             )
         with numeric_columns[3]:
             number_of_floors = st.number_input(
-                "Number of Floors", min_value=1, max_value=200,
+                "Number of Floors",
                 value=max(1, int(data["number_of_floors"].median())), step=1,
             )
             total_units = st.number_input(
-                "Total Units", min_value=1, max_value=20_000,
+                "Total Units",
                 value=max(1, int(data["total_units"].median())), step=1,
             )
 
@@ -1977,54 +2157,65 @@ def render_scope_predictor(data: pd.DataFrame, selected_scope: str = "10%") -> N
         "developer": developer,
         "city": city,
     }
+
+    validation_errors = validate_live_numeric_inputs(values)
+    if validation_errors:
+        st.error("Prediction cannot be generated: " + " ".join(validation_errors))
+        return
+
+    outside_range = outside_observed_range_fields(
+        values,
+        observed_numeric_ranges(data),
+    )
+    if outside_range:
+        st.warning(
+            "Some inputs are outside the range represented in the training data. "
+            "Predictions may involve extrapolation and may be less reliable. "
+            f"Outside observed range: {', '.join(outside_range)}."
+        )
+
     try:
         selected_models = load_scope_models(selected_scope)
         full_market_models = (
             selected_models if selected_scope == "0%" else load_scope_models("0%")
         )
-        selected_predictions = {
-            name: predict_scope_model(
-                name,
-                selected_models[name],
-                values,
-                description,
-                selected_models[name].description_length_median_,
-            )
-            for name in FINAL_MODELS
-        }
+        selected_predictions = predict_scope_models(
+            selected_models,
+            values,
+            description,
+        )
         full_market_predictions = (
             selected_predictions
             if selected_scope == "0%"
-            else {
-                name: predict_scope_model(
-                    name,
-                    full_market_models[name],
-                    values,
-                    description,
-                    full_market_models[name].description_length_median_,
-                )
-                for name in FINAL_MODELS
-            }
+            else predict_scope_models(full_market_models, values, description)
         )
         output = prediction_comparison_frame(
             selected_predictions,
             full_market_predictions,
         )
-    except ValueError as error:
-        st.error(str(error))
+    except Exception:
+        LOGGER.exception("Live prediction models could not be loaded.")
+        st.error("Prediction models could not be loaded. Please try again later.")
         return
 
-    final_prediction = selected_predictions[FINAL_MODEL_NAME]
+    final_prediction = final_model_prediction(selected_predictions)
     st.write("### Estimated Listing Price")
     result_columns = st.columns(3)
     result_columns[0].metric(
-        "Estimated Price", f"RM {final_prediction['total_price_RM']:,.0f}"
+        "Estimated Price",
+        f"RM {final_prediction['total_price_RM']:,.0f}" if final_prediction else "N/A",
     )
     result_columns[1].metric(
-        "Estimated PPSF", f"RM {final_prediction['ppsf_RM']:,.0f}"
+        "Estimated PPSF",
+        f"RM {final_prediction['ppsf_RM']:,.0f}" if final_prediction else "N/A",
     )
     result_columns[2].metric("Market Scope", selected_scope)
     st.caption(f"Model: {FINAL_MODEL_NAME} · Saved deployment artifact")
+    if final_prediction is None:
+        st.error(
+            "The selected final model could not provide a reliable positive estimate "
+            "for this input. Available alternative model results are shown below."
+        )
 
     recommendation = recommended_model_for_scope(
         load_all_models_trimming_summary(), selected_scope
@@ -2040,9 +2231,35 @@ def render_scope_predictor(data: pd.DataFrame, selected_scope: str = "10%") -> N
                 "Full-Market Prediction": "RM {:,.0f}",
                 "Difference (RM)": "RM {:+,.0f}",
                 "Difference (%)": "{:+.2f}%",
-            }
+            },
+            na_rep="N/A",
         )
         st.dataframe(styled, width="stretch", hide_index=True)
+
+    ridge_unavailable = (
+        not selected_predictions["Ridge Regression"]["available"]
+        or not full_market_predictions["Ridge Regression"]["available"]
+    )
+    for model_name in FINAL_MODELS:
+        selected_outcome = selected_predictions[model_name]
+        full_outcome = full_market_predictions[model_name]
+        if selected_outcome["available"] and full_outcome["available"]:
+            continue
+        message = (
+            selected_outcome["message"]
+            if not selected_outcome["available"]
+            else full_outcome["message"]
+        )
+        st.warning(message)
+    if ridge_unavailable:
+        with st.expander("Why is Ridge Regression unavailable?"):
+            st.write(
+                "Ridge Regression is a linear model and its output is not mathematically "
+                "constrained to remain positive. For unusual combinations of inputs outside "
+                "the patterns represented in the training data, the model can extrapolate to "
+                "a non-positive price estimate. The prototype therefore marks the result as "
+                "unavailable instead of displaying an unrealistic RM0 or negative value."
+            )
     if selected_scope == "0%":
         st.caption(
             "The selected scope is the full market, so both prediction columns use the "
